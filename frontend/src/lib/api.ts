@@ -1,0 +1,274 @@
+import type {
+  ChatMsg,
+  Job,
+  NotificationItem,
+  Proposal,
+  Review,
+  User,
+  Workspace,
+} from "@/types/cfms";
+
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
+
+const isLoopbackHost = (hostname: string) => LOOPBACK_HOSTS.has(hostname);
+
+const resolveDefaultApiBaseUrl = () => {
+  if (typeof window === "undefined") return "http://localhost:5000/api";
+
+  const protocol = window.location.protocol === "https:" ? "https:" : "http:";
+  const hostname = window.location.hostname || "localhost";
+  return `${protocol}//${hostname}:5000/api`;
+};
+
+const resolveApiBaseUrl = () => {
+  const configuredApiUrl = import.meta.env.VITE_API_URL;
+  if (!configuredApiUrl) return resolveDefaultApiBaseUrl();
+  if (typeof window === "undefined") return configuredApiUrl;
+
+  try {
+    const configuredUrl = new URL(configuredApiUrl);
+    const runtimeHostname = window.location.hostname;
+    if (isLoopbackHost(configuredUrl.hostname) && !isLoopbackHost(runtimeHostname)) {
+      configuredUrl.hostname = runtimeHostname;
+      return configuredUrl.toString();
+    }
+  } catch {
+    return configuredApiUrl;
+  }
+
+  return configuredApiUrl;
+};
+
+const API_BASE_URL = resolveApiBaseUrl();
+const TOKEN_KEY = "cfms_token";
+
+type ApiEnvelope<T> = {
+  success: boolean;
+  message: string;
+  data: T;
+};
+
+type RequestOptions = {
+  method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
+  body?: unknown;
+  token?: string | null;
+  skipAuthRedirect?: boolean;
+};
+
+export class HttpError extends Error {
+  status: number;
+  data: unknown;
+
+  constructor(status: number, message: string, data: unknown = null) {
+    super(message);
+    this.status = status;
+    this.data = data;
+  }
+}
+
+export const authStorage = {
+  getToken: () => localStorage.getItem(TOKEN_KEY),
+  setToken: (token: string) => localStorage.setItem(TOKEN_KEY, token),
+  clearToken: () => localStorage.removeItem(TOKEN_KEY),
+};
+
+const buildUrl = (path: string, params?: Record<string, string | number | boolean | undefined>) => {
+  const url = new URL(`${API_BASE_URL}${path}`);
+  if (params) {
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== null && value !== "") {
+        url.searchParams.set(key, String(value));
+      }
+    }
+  }
+  return url.toString();
+};
+
+const request = async <T>(
+  path: string,
+  { method = "GET", body, token, skipAuthRedirect = false }: RequestOptions = {},
+  params?: Record<string, string | number | boolean | undefined>
+): Promise<T> => {
+  const resolvedToken = token ?? authStorage.getToken();
+  const requestUrl = buildUrl(path, params);
+
+  let response: Response;
+  try {
+    response = await fetch(requestUrl, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        ...(resolvedToken ? { Authorization: `Bearer ${resolvedToken}` } : {}),
+      },
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+  } catch {
+    throw new HttpError(
+      0,
+      `Unable to reach backend at ${requestUrl}. Make sure the backend server is running, VITE_API_URL is correct, and CORS allows your frontend origin.`
+    );
+  }
+
+  let payload: ApiEnvelope<T> | null = null;
+  try {
+    payload = (await response.json()) as ApiEnvelope<T>;
+  } catch {
+    payload = null;
+  }
+
+  if (!response.ok || !payload?.success) {
+    const message = payload?.message || `Request failed with status ${response.status}`;
+
+    if (response.status === 401 && !skipAuthRedirect) {
+      authStorage.clearToken();
+      window.dispatchEvent(new CustomEvent("cfms:unauthorized"));
+    }
+
+    throw new HttpError(response.status, message, payload?.data ?? null);
+  }
+
+  return payload.data;
+};
+
+export const api = {
+  auth: {
+    sendOtp: (input: { name: string; email: string; password: string }) =>
+      request<{ email: string; expiresIn: number; resendAfter: number }>("/auth/send-otp", {
+        method: "POST",
+        body: input,
+        skipAuthRedirect: true,
+      }),
+
+    verifyOtp: (input: { email: string; otp: string }) =>
+      request<{ token: string; user: User }>("/auth/verify-otp", {
+        method: "POST",
+        body: input,
+        skipAuthRedirect: true,
+      }),
+
+    login: (input: { email: string; password: string }) =>
+      request<{ token: string; user: User }>("/auth/login", {
+        method: "POST",
+        body: input,
+        skipAuthRedirect: true,
+      }),
+
+    me: () => request<{ user: User }>("/auth/me"),
+
+    switchRole: (role?: "poster" | "freelancer") =>
+      request<{ user: User }>("/auth/switch-role", {
+        method: "PATCH",
+        body: role ? { role } : {},
+      }),
+  },
+
+  dashboard: {
+    summary: () =>
+      request<{
+        role: "poster" | "freelancer";
+        stats: Record<string, number>;
+        recentJobs: Job[];
+      }>("/dashboard/summary"),
+  },
+
+  jobs: {
+    list: (params?: {
+      search?: string;
+      status?: string;
+      skills?: string;
+      page?: number;
+      limit?: number;
+      mine?: boolean;
+      assignedToMe?: boolean;
+    }) => request<{ items: Job[]; pagination: { page: number; limit: number; total: number; totalPages: number } }>("/jobs", {}, params),
+
+    getById: (jobId: string) => request<{ job: Job }>(`/jobs/${jobId}`),
+
+    create: (input: {
+      title: string;
+      description: string;
+      skills: string[];
+      budget: number;
+      deadline: string;
+      deliverables: string;
+      referenceLinks?: string[];
+    }) => request<{ job: Job }>("/jobs", { method: "POST", body: input }),
+
+    update: (
+      jobId: string,
+      input: Partial<{
+        title: string;
+        description: string;
+        skills: string[];
+        budget: number;
+        deadline: string;
+        deliverables: string;
+        referenceLinks: string[];
+      }>
+    ) => request<{ job: Job }>(`/jobs/${jobId}`, { method: "PATCH", body: input }),
+
+    remove: (jobId: string) => request<null>(`/jobs/${jobId}`, { method: "DELETE" }),
+
+    apply: (jobId: string, input: { approach: string; timeline: string; quote: number }) =>
+      request<{ proposal: Proposal }>(`/jobs/${jobId}/proposals`, { method: "POST", body: input }),
+
+    listProposals: (jobId: string) => request<{ proposals: Proposal[] }>(`/jobs/${jobId}/proposals`),
+
+    updateProposalStatus: (jobId: string, proposalId: string, action: "accept" | "reject") =>
+      request<{ proposal: Proposal; workspaceId?: string }>(`/jobs/${jobId}/proposals/${proposalId}/status`, {
+        method: "PATCH",
+        body: { action },
+      }),
+
+    myProposals: () =>
+      request<{
+        proposals: Array<
+          Proposal & {
+            jobId: string;
+            jobTitle: string;
+            jobStatus: string;
+          }
+        >;
+      }>("/jobs/my-proposals"),
+  },
+
+  users: {
+    getMe: () => request<{ user: User }>("/users/me"),
+    updateMe: (input: Partial<User>) => request<{ user: User }>("/users/me", { method: "PATCH", body: input }),
+    getReviews: (userId: string) => request<{ reviews: Review[] }>(`/users/${userId}/reviews`),
+  },
+
+  workspaces: {
+    listMine: () => request<{ workspaces: Workspace[] }>("/workspaces"),
+    getById: (workspaceId: string) => request<{ workspace: Workspace; messages: ChatMsg[] }>(`/workspaces/${workspaceId}`),
+    messages: (workspaceId: string) => request<{ messages: ChatMsg[] }>(`/workspaces/${workspaceId}/messages`),
+    sendMessage: (workspaceId: string, text: string) =>
+      request<{ message: ChatMsg }>(`/workspaces/${workspaceId}/messages`, { method: "POST", body: { text } }),
+    addResource: (workspaceId: string, url: string) =>
+      request<{ resources: Workspace["resources"] }>(`/workspaces/${workspaceId}/resources`, {
+        method: "POST",
+        body: { url },
+      }),
+    start: (workspaceId: string) =>
+      request<{ jobStatus: string }>(`/workspaces/${workspaceId}/start`, { method: "POST", body: {} }),
+    submit: (workspaceId: string, input: { link: string; notes?: string }) =>
+      request<{ submission: Workspace["submission"]; jobStatus: string }>(`/workspaces/${workspaceId}/submit`, {
+        method: "POST",
+        body: input,
+      }),
+    approve: (workspaceId: string) =>
+      request<{ approvedAt: string; jobStatus: string }>(`/workspaces/${workspaceId}/approve`, {
+        method: "POST",
+        body: {},
+      }),
+    review: (workspaceId: string, input: { toUserId?: string; rating: number; comment?: string }) =>
+      request<{ review: Review }>(`/workspaces/${workspaceId}/reviews`, { method: "POST", body: input }),
+  },
+
+  notifications: {
+    list: () => request<{ notifications: NotificationItem[]; unreadCount: number }>("/notifications"),
+    markRead: (notificationId: string) =>
+      request<null>(`/notifications/${notificationId}/read`, { method: "PATCH", body: {} }),
+    markAllRead: () => request<null>("/notifications/read-all", { method: "PATCH", body: {} }),
+  },
+};
