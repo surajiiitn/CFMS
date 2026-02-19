@@ -124,11 +124,17 @@ export const login = asyncHandler(async (req, res) => {
   const normalizedEmail = email.toLowerCase().trim();
   const user = await User.findOne({ email: normalizedEmail });
 
-  if (!user) {
+  if (!user || !user.passwordHash || typeof user.passwordHash !== "string") {
     throw new ApiError(401, "Invalid credentials");
   }
 
-  const passwordOk = await bcrypt.compare(password, user.passwordHash);
+  let passwordOk = false;
+  try {
+    passwordOk = await bcrypt.compare(password, user.passwordHash);
+  } catch {
+    passwordOk = false;
+  }
+
   if (!passwordOk) {
     throw new ApiError(401, "Invalid credentials");
   }

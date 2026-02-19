@@ -10,9 +10,14 @@ export const saveOtpPayload = async (email, payload) => {
   const value = JSON.stringify(payload);
 
   if (isRedisReady()) {
-    const redis = getRedisClient();
-    await redis.set(key, value, { EX: env.otpTtlSeconds });
-    return;
+    try {
+      const redis = getRedisClient();
+      await redis.set(key, value, { EX: env.otpTtlSeconds });
+      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown Redis write error";
+      console.warn(`Redis SET failed for OTP store. Falling back to memory: ${message}`);
+    }
   }
 
   const expiresAt = Date.now() + env.otpTtlSeconds * 1000;
@@ -23,9 +28,14 @@ export const getOtpPayload = async (email) => {
   const key = buildKey(email);
 
   if (isRedisReady()) {
-    const redis = getRedisClient();
-    const value = await redis.get(key);
-    return value ? JSON.parse(value) : null;
+    try {
+      const redis = getRedisClient();
+      const value = await redis.get(key);
+      return value ? JSON.parse(value) : null;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown Redis read error";
+      console.warn(`Redis GET failed for OTP store. Falling back to memory: ${message}`);
+    }
   }
 
   const entry = memoryStore.get(key);
@@ -41,9 +51,14 @@ export const deleteOtpPayload = async (email) => {
   const key = buildKey(email);
 
   if (isRedisReady()) {
-    const redis = getRedisClient();
-    await redis.del(key);
-    return;
+    try {
+      const redis = getRedisClient();
+      await redis.del(key);
+      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown Redis delete error";
+      console.warn(`Redis DEL failed for OTP store. Falling back to memory: ${message}`);
+    }
   }
 
   memoryStore.delete(key);
