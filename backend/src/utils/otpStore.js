@@ -31,7 +31,11 @@ export const getOtpPayload = async (email) => {
     try {
       const redis = getRedisClient();
       const value = await redis.get(key);
-      return value ? JSON.parse(value) : null;
+      if (value) {
+        return JSON.parse(value);
+      }
+      // If Redis has no value (e.g., write failed and we used memory fallback),
+      // continue and check memory store before declaring "not found".
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown Redis read error";
       console.warn(`Redis GET failed for OTP store. Falling back to memory: ${message}`);
