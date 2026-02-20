@@ -141,6 +141,14 @@ export const Navbar = ({ title, mobileOpen, onToggleMobile }: NavbarProps) => {
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuItem onClick={handleSwitchRole} disabled={switchingRole} className="sm:hidden">
+              {switchingRole ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <ArrowLeftRight className="mr-2 h-4 w-4" />
+              )}
+              Switch to {user?.role === "poster" ? "Freelancer" : "Poster"}
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => navigate("/profile")}>Profile</DropdownMenuItem>
             <DropdownMenuItem onClick={logout}>Logout</DropdownMenuItem>
           </DropdownMenuContent>
