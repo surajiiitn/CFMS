@@ -20,7 +20,7 @@ export const statusTransitions = {
   Open: ["Assigned"],
   Assigned: ["InProgress"],
   InProgress: ["Submitted"],
-  Submitted: ["Completed"],
+  Submitted: ["InProgress", "Completed"],
   Completed: [],
 };
 

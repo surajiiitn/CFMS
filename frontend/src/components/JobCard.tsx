@@ -1,4 +1,4 @@
-import { Calendar, DollarSign, Users, ArrowUpRight } from "lucide-react";
+import { Calendar, IndianRupee, Users, ArrowUpRight } from "lucide-react";
 import type { Job } from "@/types/cfms";
 import { StatusBadge } from "./StatusBadge";
 import { Link } from "react-router-dom";
@@ -31,7 +31,7 @@ export const JobCard = ({ job }: { job: Job }) => (
 
       <div className="flex flex-wrap items-center gap-4 text-xs font-semibold text-muted-foreground">
         <span className="inline-flex items-center gap-1.5">
-          <DollarSign className="h-3.5 w-3.5" />₹{job.budget}
+          <IndianRupee className="h-3.5 w-3.5" /> ₹{job.budget}
         </span>
         <span className="inline-flex items-center gap-1.5">
           <Calendar className="h-3.5 w-3.5" />{job.deadline}

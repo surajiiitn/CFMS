@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 import type { Job } from "@/types/cfms";
-import { Calendar, DollarSign, ArrowLeft, Loader2, FileText, UserRound } from "lucide-react";
+import { Calendar, IndianRupee, ArrowLeft, Loader2, FileText, UserRound } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const JobDetails = () => {
@@ -189,7 +189,7 @@ const JobDetails = () => {
           <section className="rounded-3xl border border-border/70 bg-card/95 p-5 shadow-sm">
             <div className="space-y-3 text-sm">
               <div className="flex items-center gap-2">
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                <IndianRupee className="h-4 w-4 text-muted-foreground" />
                 <span className="text-muted-foreground">Budget</span>
                 <span className="ml-auto font-semibold text-card-foreground">₹{job.budget}</span>
               </div>

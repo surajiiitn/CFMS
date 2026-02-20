@@ -4,7 +4,12 @@ import { User } from "../models/User.js";
 import { Workspace } from "../models/Workspace.js";
 import { Message } from "../models/Message.js";
 import { createNotification } from "../utils/notifications.js";
-import { ensureParticipant, getCounterpartyId, setJobStatus } from "../utils/workflow.js";
+import {
+  ensureParticipant,
+  ensureWorkspaceActive,
+  getCounterpartyId,
+  setJobStatus,
+} from "../utils/workflow.js";
 import { serializeMessage } from "../utils/serializer.js";
 import { setSocketServer } from "../config/socket.js";
 import { isAllowedOrigin } from "../config/env.js";
@@ -18,6 +23,22 @@ const getTokenFromHandshake = (socket) => {
   if (scheme === "Bearer") return token;
 
   return null;
+};
+
+const toPublicSocketErrorMessage = (error, fallback) => {
+  const message = typeof error?.message === "string" ? error.message : "";
+  const safeMessages = new Set([
+    "Workspace not found",
+    "Workspace is closed",
+    "Forbidden",
+    "workspaceId and text are required",
+  ]);
+
+  if (safeMessages.has(message)) {
+    return message;
+  }
+
+  return fallback;
 };
 
 export const initSocket = (httpServer) => {
@@ -59,11 +80,15 @@ export const initSocket = (httpServer) => {
         if (!workspace) throw new Error("Workspace not found");
 
         ensureParticipant(workspace, socket.user._id);
+        ensureWorkspaceActive(workspace);
         socket.join(`workspace:${workspace._id.toString()}`);
 
         callback?.({ success: true });
       } catch (error) {
-        callback?.({ success: false, message: error.message || "Unable to join workspace" });
+        callback?.({
+          success: false,
+          message: toPublicSocketErrorMessage(error, "Unable to join workspace"),
+        });
       }
     });
 
@@ -85,6 +110,7 @@ export const initSocket = (httpServer) => {
         if (!workspace) throw new Error("Workspace not found");
 
         ensureParticipant(workspace, socket.user._id);
+        ensureWorkspaceActive(workspace);
 
         if (workspace.job.status === "Assigned") {
           await setJobStatus(workspace.job, "InProgress");
@@ -112,7 +138,10 @@ export const initSocket = (httpServer) => {
 
         callback?.({ success: true, data: serialized });
       } catch (error) {
-        callback?.({ success: false, message: error.message || "Unable to send message" });
+        callback?.({
+          success: false,
+          message: toPublicSocketErrorMessage(error, "Unable to send message"),
+        });
       }
     });
   });

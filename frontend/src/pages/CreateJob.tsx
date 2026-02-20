@@ -10,6 +10,15 @@ import { useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
+const MIN_DESCRIPTION_WORDS = 15;
+const MAX_DESCRIPTION_WORDS = 300;
+
+const countWords = (value: string) =>
+  value
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length;
+
 const CreateJob = () => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -22,6 +31,7 @@ const CreateJob = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const descriptionWordCount = countWords(description);
 
   const addSkill = () => {
     const value = skillInput.trim();
@@ -39,15 +49,33 @@ const CreateJob = () => {
       return;
     }
 
+    if (descriptionWordCount < MIN_DESCRIPTION_WORDS) {
+      toast({
+        title: "Description too short",
+        description: `Please write at least ${MIN_DESCRIPTION_WORDS} words in the description.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (descriptionWordCount > MAX_DESCRIPTION_WORDS) {
+      toast({
+        title: "Description too long",
+        description: `Please keep the description within ${MAX_DESCRIPTION_WORDS} words.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       await api.jobs.create({
-        title,
-        description,
+        title: title.trim(),
+        description: description.trim(),
         skills,
         budget: Number(budget),
         deadline,
-        deliverables,
+        deliverables: deliverables.trim(),
       });
       toast({ title: "Job posted", description: "Your listing is now live." });
       navigate("/jobs");
@@ -105,6 +133,16 @@ const CreateJob = () => {
               onChange={(e) => setDescription(e.target.value)}
               rows={6}
             />
+            <p
+              className={`text-xs ${
+                descriptionWordCount > 0 &&
+                (descriptionWordCount < MIN_DESCRIPTION_WORDS || descriptionWordCount > MAX_DESCRIPTION_WORDS)
+                  ? "text-destructive"
+                  : "text-muted-foreground"
+              }`}
+            >
+              Word count: {descriptionWordCount} (min {MIN_DESCRIPTION_WORDS}, max {MAX_DESCRIPTION_WORDS})
+            </p>
           </div>
 
           <div className="space-y-2">

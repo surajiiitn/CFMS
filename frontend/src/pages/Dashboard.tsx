@@ -5,7 +5,7 @@ import { JobCard } from "@/components/JobCard";
 import { api } from "@/lib/api";
 import type { Job } from "@/types/cfms";
 import type { LucideIcon } from "lucide-react";
-import { Briefcase, DollarSign, CheckCircle, Clock, FileText, TrendingUp, Sparkles } from "lucide-react";
+import { Briefcase, IndianRupee, CheckCircle, Clock, FileText, TrendingUp, Sparkles } from "lucide-react";
 
 const StatCard = ({ icon: Icon, label, value, color }: { icon: LucideIcon; label: string; value: string; color: string }) => (
   <div className="rounded-2xl border border-border/70 bg-card/95 p-5 shadow-sm">
@@ -61,7 +61,7 @@ const Dashboard = () => {
             { icon: Briefcase, label: "Open Jobs", value: String(stats.availableJobs || 0), color: "bg-accent/15 text-accent" },
             { icon: FileText, label: "My Proposals", value: String(stats.myProposals || 0), color: "bg-primary/10 text-primary" },
             { icon: TrendingUp, label: "Active Gigs", value: String(stats.activeGigs || 0), color: "bg-warning/10 text-warning" },
-            { icon: DollarSign, label: "Earned", value: `₹${stats.earned || 0}`, color: "bg-success/10 text-success" },
+            { icon: IndianRupee, label: "Earned", value: `₹${stats.earned || 0}`, color: "bg-success/10 text-success" },
           ],
     [isPoster, stats]
   );

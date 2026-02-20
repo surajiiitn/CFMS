@@ -7,7 +7,7 @@ import { Proposal } from "../models/Proposal.js";
 import { Workspace } from "../models/Workspace.js";
 import { clientJobToDbStatus } from "../utils/status.js";
 import { getPagination } from "../utils/pagination.js";
-import { sanitizeSkillList } from "../utils/validation.js";
+import { getJobDescriptionWordCountError, sanitizeSkillList } from "../utils/validation.js";
 import { serializeJob, serializeProposal } from "../utils/serializer.js";
 
 const userProjection = "name email avatar branch year skills bio github portfolio activeRole ratingAvg";
@@ -127,6 +127,12 @@ export const createJob = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Budget must be a positive number");
   }
 
+  const normalizedDescription = String(description).trim();
+  const descriptionWordError = getJobDescriptionWordCountError(normalizedDescription);
+  if (descriptionWordError) {
+    throw new ApiError(400, descriptionWordError);
+  }
+
   const parsedDeadline = new Date(deadline);
   if (Number.isNaN(parsedDeadline.getTime())) {
     throw new ApiError(400, "Deadline is invalid");
@@ -140,7 +146,7 @@ export const createJob = asyncHandler(async (req, res) => {
 
   const job = await Job.create({
     title: String(title).trim(),
-    description: String(description).trim(),
+    description: normalizedDescription,
     skills: sanitizeSkillList(skills),
     budget: parsedBudget,
     deadline: parsedDeadline,
@@ -174,7 +180,14 @@ export const updateJob = asyncHandler(async (req, res) => {
   }
 
   if (title !== undefined) job.title = String(title).trim();
-  if (description !== undefined) job.description = String(description).trim();
+  if (description !== undefined) {
+    const normalizedDescription = String(description).trim();
+    const descriptionWordError = getJobDescriptionWordCountError(normalizedDescription);
+    if (descriptionWordError) {
+      throw new ApiError(400, descriptionWordError);
+    }
+    job.description = normalizedDescription;
+  }
   if (skills !== undefined) job.skills = sanitizeSkillList(skills);
   if (budget !== undefined) {
     const parsedBudget = Number(budget);

@@ -2,13 +2,17 @@ import validator from "validator";
 import { asyncHandler } from "../middleware/asyncHandler.js";
 import { ApiError } from "../utils/apiError.js";
 import { sendSuccess } from "../utils/apiResponse.js";
-import { Job } from "../models/Job.js";
 import { Workspace } from "../models/Workspace.js";
 import { Message } from "../models/Message.js";
 import { Proposal } from "../models/Proposal.js";
 import { createNotification } from "../utils/notifications.js";
 import { serializeJob, serializeMessage, serializeWorkspace } from "../utils/serializer.js";
-import { ensureParticipant, getCounterpartyId, setJobStatus } from "../utils/workflow.js";
+import {
+  ensureParticipant,
+  ensureWorkspaceActive,
+  getCounterpartyId,
+  setJobStatus,
+} from "../utils/workflow.js";
 import { getSocketServer } from "../config/socket.js";
 
 const userProjection = "name email avatar branch year skills bio github portfolio activeRole ratingAvg";
@@ -82,6 +86,7 @@ export const getWorkspaceById = asyncHandler(async (req, res) => {
 
   const workspace = await loadWorkspace(workspaceId);
   ensureParticipant(workspace, req.user._id);
+  ensureWorkspaceActive(workspace);
 
   const applicantsCount = await Proposal.countDocuments({ job: workspace.job._id });
   const serializedJob = serializeJob(workspace.job, { applicants: [], applicantsCount });
@@ -98,10 +103,11 @@ export const listWorkspaceMessages = asyncHandler(async (req, res) => {
   const { workspaceId } = req.params;
   const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 200);
 
-  const workspace = await Workspace.findById(workspaceId);
+  const workspace = await Workspace.findById(workspaceId).populate("job");
   if (!workspace) throw new ApiError(404, "Workspace not found");
 
   ensureParticipant(workspace, req.user._id);
+  ensureWorkspaceActive(workspace);
 
   const messages = await Message.find({ workspace: workspace._id }).sort({ createdAt: 1 }).limit(limit);
 
@@ -122,6 +128,7 @@ export const sendWorkspaceMessage = asyncHandler(async (req, res) => {
   if (!workspace) throw new ApiError(404, "Workspace not found");
 
   ensureParticipant(workspace, req.user._id);
+  ensureWorkspaceActive(workspace);
 
   await maybeMoveToInProgress(workspace.job);
 
@@ -162,6 +169,7 @@ export const addWorkspaceResource = asyncHandler(async (req, res) => {
   if (!workspace) throw new ApiError(404, "Workspace not found");
 
   ensureParticipant(workspace, req.user._id);
+  ensureWorkspaceActive(workspace);
 
   await maybeMoveToInProgress(workspace.job);
 
@@ -189,6 +197,7 @@ export const startWorkspace = asyncHandler(async (req, res) => {
   if (!workspace) throw new ApiError(404, "Workspace not found");
 
   ensureParticipant(workspace, req.user._id);
+  ensureWorkspaceActive(workspace);
 
   if (workspace.job.status === "Assigned") {
     await setJobStatus(workspace.job, "InProgress");
@@ -211,6 +220,7 @@ export const submitWorkspaceWork = asyncHandler(async (req, res) => {
   if (!workspace) throw new ApiError(404, "Workspace not found");
 
   ensureParticipant(workspace, req.user._id);
+  ensureWorkspaceActive(workspace);
 
   if (workspace.freelancer.toString() !== req.user._id.toString()) {
     throw new ApiError(403, "Only the selected freelancer can submit work");
@@ -253,6 +263,56 @@ export const submitWorkspaceWork = asyncHandler(async (req, res) => {
   });
 });
 
+export const reopenWorkspaceForDevelopment = asyncHandler(async (req, res) => {
+  const { workspaceId } = req.params;
+
+  const workspace = await Workspace.findById(workspaceId).populate("job");
+  if (!workspace) throw new ApiError(404, "Workspace not found");
+
+  ensureParticipant(workspace, req.user._id);
+  ensureWorkspaceActive(workspace);
+
+  if (workspace.poster.toString() !== req.user._id.toString()) {
+    throw new ApiError(403, "Only the poster can request changes");
+  }
+
+  if (!workspace.submission?.submittedAt) {
+    throw new ApiError(400, "No submission found");
+  }
+
+  if (workspace.job.status !== "Submitted") {
+    throw new ApiError(400, "Only submitted work can be sent back to development");
+  }
+
+  await setJobStatus(workspace.job, "InProgress");
+
+  workspace.submission = {
+    link: "",
+    notes: "",
+    submittedAt: null,
+  };
+  await workspace.save();
+
+  emitWorkspaceEvent(workspace._id.toString(), "workspace:reopened", {
+    workspaceId: workspace._id.toString(),
+    jobStatus: workspace.job.status,
+  });
+
+  await createNotification({
+    recipient: workspace.freelancer,
+    actor: req.user._id,
+    type: "message",
+    title: "Changes Requested",
+    description: `${req.user.name} requested updates before approval`,
+    metadata: { workspace: workspace._id, job: workspace.job._id },
+  });
+
+  return sendSuccess(res, 200, "Submission moved back to development", {
+    jobStatus: workspace.job.status,
+    submission: workspace.submission,
+  });
+});
+
 export const approveWorkspaceSubmission = asyncHandler(async (req, res) => {
   const { workspaceId } = req.params;
 
@@ -260,6 +320,7 @@ export const approveWorkspaceSubmission = asyncHandler(async (req, res) => {
   if (!workspace) throw new ApiError(404, "Workspace not found");
 
   ensureParticipant(workspace, req.user._id);
+  ensureWorkspaceActive(workspace);
 
   if (workspace.poster.toString() !== req.user._id.toString()) {
     throw new ApiError(403, "Only the poster can approve submissions");

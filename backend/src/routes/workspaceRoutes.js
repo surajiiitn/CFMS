@@ -6,6 +6,7 @@ import {
   getWorkspaceById,
   listMyWorkspaces,
   listWorkspaceMessages,
+  reopenWorkspaceForDevelopment,
   sendWorkspaceMessage,
   startWorkspace,
   submitWorkspaceWork,
@@ -23,6 +24,7 @@ router.post("/:workspaceId/messages", sendWorkspaceMessage);
 router.post("/:workspaceId/resources", addWorkspaceResource);
 router.post("/:workspaceId/start", startWorkspace);
 router.post("/:workspaceId/submit", submitWorkspaceWork);
+router.post("/:workspaceId/reopen", reopenWorkspaceForDevelopment);
 router.post("/:workspaceId/approve", approveWorkspaceSubmission);
 router.post("/:workspaceId/reviews", createWorkspaceReview);
 

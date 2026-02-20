@@ -45,6 +45,9 @@ const TOKEN_KEY = "cfms_token";
 const MAX_RETRIES = 2;
 const RETRYABLE_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
 const BASE_RETRY_DELAY_MS = 300;
+const URL_PATTERN = /https?:\/\/[^\s)]+/gi;
+const SENSITIVE_MESSAGE_PATTERN =
+  /(localhost|127\.0\.0\.1|backend|stack|exception|trace|mongodb|postgres|redis|econn|enotfound|cors|vite_api_url)/i;
 
 type ApiEnvelope<T> = {
   success: boolean;
@@ -90,6 +93,47 @@ const buildUrl = (path: string, params?: Record<string, string | number | boolea
 
 const sleep = (ms: number) => new Promise((resolve) => globalThis.setTimeout(resolve, ms));
 
+const sanitizeBackendMessage = (rawMessage?: string | null) => {
+  const cleaned = String(rawMessage || "")
+    .trim()
+    .replace(URL_PATTERN, "[redacted]");
+
+  if (!cleaned) return "";
+  if (SENSITIVE_MESSAGE_PATTERN.test(cleaned)) return "";
+  return cleaned;
+};
+
+const toUserFacingErrorMessage = ({
+  path,
+  status,
+  rawMessage,
+  network = false,
+}: {
+  path: string;
+  status: number;
+  rawMessage?: string | null;
+  network?: boolean;
+}) => {
+  if (network) {
+    return "Unable to connect to the server. Please try again.";
+  }
+
+  if (path === "/auth/login") {
+    if (status === 401) return "Invalid email or password.";
+    if (status === 429) return "Too many login attempts. Please wait and try again.";
+    return sanitizeBackendMessage(rawMessage) || "Unable to sign in right now. Please try again.";
+  }
+
+  const sanitized = sanitizeBackendMessage(rawMessage);
+  if (sanitized) return sanitized;
+
+  if (status === 401) return "Your session has expired. Please sign in again.";
+  if (status === 403) return "You are not allowed to perform this action.";
+  if (status === 404) return "Requested resource was not found.";
+  if (status >= 500) return "Something went wrong on the server. Please try again.";
+  return "Request failed. Please try again.";
+};
+
 const request = async <T>(
   path: string,
   { method = "GET", body, token, skipAuthRedirect = false }: RequestOptions = {},
@@ -123,7 +167,11 @@ const request = async <T>(
 
       throw new HttpError(
         0,
-        `Unable to reach backend at ${requestUrl}. Make sure the backend server is running, VITE_API_URL is correct, and CORS allows your frontend origin.`
+        toUserFacingErrorMessage({
+          path,
+          status: 0,
+          network: true,
+        })
       );
     }
 
@@ -147,7 +195,11 @@ const request = async <T>(
     }
 
     if (failedRequest) {
-      const message = payload?.message || `Request failed with status ${response.status}`;
+      const message = toUserFacingErrorMessage({
+        path,
+        status: response.status,
+        rawMessage: payload?.message,
+      });
 
       if (response.status === 401 && !skipAuthRedirect) {
         authStorage.clearToken();
@@ -160,7 +212,7 @@ const request = async <T>(
     return payload.data;
   }
 
-  throw new HttpError(0, `Request failed after ${maxAttempts} attempts.`);
+  throw new HttpError(0, "Request failed after multiple retries. Please try again.");
 };
 
 export const pingBackend = async (signal?: AbortSignal) => {
@@ -316,6 +368,11 @@ export const api = {
       request<{ submission: Workspace["submission"]; jobStatus: string }>(`/workspaces/${workspaceId}/submit`, {
         method: "POST",
         body: input,
+      }),
+    reopen: (workspaceId: string) =>
+      request<{ jobStatus: string; submission: Workspace["submission"] }>(`/workspaces/${workspaceId}/reopen`, {
+        method: "POST",
+        body: {},
       }),
     approve: (workspaceId: string) =>
       request<{ approvedAt: string; jobStatus: string; workspaceRemoved?: boolean }>(`/workspaces/${workspaceId}/approve`, {

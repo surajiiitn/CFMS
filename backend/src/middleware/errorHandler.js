@@ -2,7 +2,7 @@ import { ApiError } from "../utils/apiError.js";
 import { sendError } from "../utils/apiResponse.js";
 
 export const notFound = (req, res) => {
-  sendError(res, 404, `Route not found: ${req.method} ${req.originalUrl}`);
+  sendError(res, 404, "Route not found");
 };
 
 export const errorHandler = (err, _req, res, _next) => {

@@ -11,7 +11,7 @@ import { api } from "@/lib/api";
 import { connectSocket, getSocket, joinWorkspaceRoom, leaveWorkspaceRoom, sendWorkspaceSocketMessage } from "@/lib/socket";
 import type { ChatMsg, Workspace as WorkspaceType } from "@/types/cfms";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Link2, Upload, Plus, Calendar, DollarSign, CheckCircle2, FolderOpen } from "lucide-react";
+import { Send, Link2, Upload, Plus, Calendar, IndianRupee, CheckCircle2, FolderOpen, RotateCcw, Loader2 } from "lucide-react";
 
 const Workspace = () => {
   const { id } = useParams();
@@ -28,6 +28,8 @@ const Workspace = () => {
   const [submissionNotes, setSubmissionNotes] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [approving, setApproving] = useState(false);
+  const [requestingChanges, setRequestingChanges] = useState(false);
   const [error, setError] = useState("");
 
   const refreshWorkspace = useCallback(async (workspaceId: string) => {
@@ -109,6 +111,10 @@ const Workspace = () => {
       refreshWorkspace(id).catch(() => null);
     };
 
+    const onReopened = () => {
+      refreshWorkspace(id).catch(() => null);
+    };
+
     const onCompleted = () => {
       navigate("/workspace", { replace: true });
     };
@@ -116,6 +122,7 @@ const Workspace = () => {
     socket.on("connect", onSocketConnect);
     socket.on("workspace:message:new", onNewMessage);
     socket.on("workspace:submitted", onSubmitted);
+    socket.on("workspace:reopened", onReopened);
     socket.on("workspace:completed", onCompleted);
 
     return () => {
@@ -123,6 +130,7 @@ const Workspace = () => {
       activeSocket?.off("connect", onSocketConnect);
       activeSocket?.off("workspace:message:new", onNewMessage);
       activeSocket?.off("workspace:submitted", onSubmitted);
+      activeSocket?.off("workspace:reopened", onReopened);
       activeSocket?.off("workspace:completed", onCompleted);
       leaveWorkspaceRoom(id);
     };
@@ -199,6 +207,7 @@ const Workspace = () => {
   const approveSubmission = async () => {
     if (!id) return;
 
+    setApproving(true);
     try {
       const data = await api.workspaces.approve(id);
       toast({ title: "Submission approved", description: "Job marked as completed." });
@@ -213,6 +222,27 @@ const Workspace = () => {
         description: err instanceof Error ? err.message : "Please try again",
         variant: "destructive",
       });
+    } finally {
+      setApproving(false);
+    }
+  };
+
+  const requestChanges = async () => {
+    if (!id) return;
+
+    setRequestingChanges(true);
+    try {
+      await api.workspaces.reopen(id);
+      toast({ title: "Changes requested", description: "Workspace moved back to development." });
+      await refreshWorkspace(id);
+    } catch (err) {
+      toast({
+        title: "Unable to request changes",
+        description: err instanceof Error ? err.message : "Please try again",
+        variant: "destructive",
+      });
+    } finally {
+      setRequestingChanges(false);
     }
   };
 
@@ -269,7 +299,7 @@ const Workspace = () => {
                 <Calendar className="h-3.5 w-3.5" /> {job.deadline}
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <DollarSign className="h-3.5 w-3.5" /> ₹{job.budget}
+                <IndianRupee className="h-3.5 w-3.5" /> ₹{job.budget}
               </span>
             </div>
           </div>
@@ -285,7 +315,14 @@ const Workspace = () => {
 
             <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-5">
               {messages.length > 0 ? (
-                messages.map((msg) => <ChatMessage key={msg.id} message={msg} isOwn={msg.senderId === user?.id} />)
+                messages.map((msg) => (
+                  <ChatMessage
+                    key={msg.id}
+                    message={msg}
+                    isOwn={msg.senderId === user?.id}
+                    isPosterMessage={msg.senderId === workspace.poster.id}
+                  />
+                ))
               ) : (
                 <p className="text-sm text-muted-foreground">No messages yet. Start the conversation.</p>
               )}
@@ -411,9 +448,21 @@ const Workspace = () => {
                   )}
 
                   {job.status === "submitted" ? (
-                    <Button className="w-full" onClick={approveSubmission}>
-                      <CheckCircle2 className="h-4 w-4" /> Approve Submission
-                    </Button>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={requestChanges}
+                        disabled={requestingChanges || approving}
+                      >
+                        {requestingChanges ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+                        Back to Development
+                      </Button>
+                      <Button className="w-full" onClick={approveSubmission} disabled={approving || requestingChanges}>
+                        {approving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                        Approve Submission
+                      </Button>
+                    </div>
                   ) : null}
                 </>
               ) : null}

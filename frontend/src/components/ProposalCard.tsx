@@ -2,7 +2,7 @@ import type { Proposal } from "@/types/cfms";
 import { StatusBadge } from "./StatusBadge";
 import { RatingStars } from "./RatingStars";
 import { Button } from "./ui/button";
-import { Clock, DollarSign } from "lucide-react";
+import { Clock, IndianRupee } from "lucide-react";
 
 export const ProposalCard = ({
   proposal,
@@ -42,7 +42,7 @@ export const ProposalCard = ({
             <Clock className="h-3.5 w-3.5" /> {proposal.timeline}
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <DollarSign className="h-3.5 w-3.5" /> ₹{proposal.quote}
+            <IndianRupee className="h-3.5 w-3.5" /> ₹{proposal.quote}
           </span>
         </div>
 
