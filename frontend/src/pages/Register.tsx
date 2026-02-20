@@ -4,8 +4,9 @@ import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, GraduationCap, CheckCircle2 } from "lucide-react";
+import { Loader2, CheckCircle2, UserRound, Mail, LockKeyhole } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { AuthLayout } from "@/components/layout/AuthLayout";
 
 type Step = "info" | "otp" | "success";
 
@@ -24,10 +25,10 @@ const Register = () => {
 
   const startCountdown = (seconds: number) => {
     setCountdown(seconds);
-    const interval = setInterval(() => {
+    const interval = window.setInterval(() => {
       setCountdown((current) => {
         if (current <= 1) {
-          clearInterval(interval);
+          window.clearInterval(interval);
           return 0;
         }
         return current - 1;
@@ -99,113 +100,177 @@ const Register = () => {
     }
   };
 
-  return (
-    <div className="flex min-h-screen">
-      <div className="hidden lg:flex lg:w-1/2 auth-gradient items-center justify-center p-12">
-        <div className="max-w-md text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-accent/20 mb-8">
-            <GraduationCap className="h-8 w-8 text-accent-foreground" />
+  const renderContent = () => {
+    if (step === "otp") {
+      return (
+        <div className="space-y-6 text-center">
+          <div>
+            <h3 className="display-font text-xl font-semibold text-foreground">Verify your email</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Enter the 6-digit code sent to <span className="font-semibold text-foreground">{email}</span>
+            </p>
           </div>
-          <h1 className="text-3xl font-bold text-primary-foreground mb-4">Join CFMS</h1>
-          <p className="text-primary-foreground/70 text-lg">Start freelancing or posting micro-jobs within your campus community.</p>
-        </div>
-      </div>
 
-      <div className="flex w-full lg:w-1/2 items-center justify-center p-8">
-        <div className="w-full max-w-md space-y-8">
-          {step === "info" && (
+          {error ? (
+            <div className="rounded-2xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              {error}
+            </div>
+          ) : null}
+
+          <div className="flex justify-center">
+            <InputOTP maxLength={6} value={otp} onChange={setOtp}>
+              <InputOTPGroup>
+                {[0, 1, 2, 3, 4, 5].map((i) => (
+                  <InputOTPSlot key={i} index={i} />
+                ))}
+              </InputOTPGroup>
+            </InputOTP>
+          </div>
+
+          <Button onClick={handleVerifyOTP} className="w-full" disabled={loading}>
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" /> Verifying
+              </>
+            ) : (
+              "Verify & Continue"
+            )}
+          </Button>
+
+          <p className="text-sm text-muted-foreground">
+            {countdown > 0 ? (
+              `Resend available in ${countdown}s`
+            ) : (
+              <button
+                type="button"
+                onClick={resendOtp}
+                className="font-semibold text-accent transition-colors hover:text-accent/80"
+                disabled={loading}
+              >
+                Resend code
+              </button>
+            )}
+          </p>
+        </div>
+      );
+    }
+
+    if (step === "success") {
+      return (
+        <div className="space-y-6 text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-success/10">
+            <CheckCircle2 className="h-8 w-8 text-success" />
+          </div>
+          <div>
+            <h3 className="display-font text-2xl font-semibold text-foreground">Account verified</h3>
+            <p className="mt-1 text-sm text-muted-foreground">Your CFMS account is ready. Continue to dashboard.</p>
+          </div>
+          <Button onClick={() => navigate("/dashboard")} className="w-full">
+            Go to Dashboard
+          </Button>
+        </div>
+      );
+    }
+
+    return (
+      <form onSubmit={handleSendOTP} className="space-y-5">
+        {error ? (
+          <div className="rounded-2xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {error}
+          </div>
+        ) : null}
+
+        <div className="space-y-2">
+          <Label htmlFor="name">Full Name</Label>
+          <div className="relative">
+            <UserRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              id="name"
+              placeholder="John Doe"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="email">College Email</Label>
+          <div className="relative">
+            <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              id="email"
+              type="email"
+              placeholder="you@college.edu"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="password">Password</Label>
+          <div className="relative">
+            <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              id="password"
+              type="password"
+              placeholder="Minimum 6 characters"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="confirm-password">Confirm Password</Label>
+          <Input
+            id="confirm-password"
+            type="password"
+            placeholder="Re-enter password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+          />
+        </div>
+
+        <Button type="submit" className="w-full" disabled={loading}>
+          {loading ? (
             <>
-              <div>
-                <h2 className="text-2xl font-bold text-foreground">Create your account</h2>
-                <p className="text-muted-foreground mt-1">Use your college email to get started</p>
-              </div>
-              <form onSubmit={handleSendOTP} className="space-y-4">
-                {error && <div className="rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div>}
-                <div className="space-y-2">
-                  <Label>Full Name</Label>
-                  <Input placeholder="John Doe" value={name} onChange={(e) => setName(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label>College Email</Label>
-                  <Input type="email" placeholder="you@college.edu" value={email} onChange={(e) => setEmail(e.target.value)} />
-                  <p className="text-xs text-muted-foreground">Use your official college email address</p>
-                </div>
-                <div className="space-y-2">
-                  <Label>Password</Label>
-                  <Input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Confirm Password</Label>
-                  <Input type="password" placeholder="••••••••" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
-                </div>
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending OTP...
-                    </>
-                  ) : (
-                    "Send Verification Code"
-                  )}
-                </Button>
-              </form>
-              <p className="text-center text-sm text-muted-foreground">
-                Already have an account? <Link to="/login" className="font-medium text-accent hover:underline">Sign in</Link>
-              </p>
+              <Loader2 className="h-4 w-4 animate-spin" /> Sending OTP
             </>
+          ) : (
+            "Send Verification Code"
           )}
+        </Button>
+      </form>
+    );
+  };
 
-          {step === "otp" && (
-            <div className="text-center space-y-6">
-              <div>
-                <h2 className="text-2xl font-bold text-foreground">Verify your email</h2>
-                <p className="text-muted-foreground mt-1">We sent a 6-digit code to <span className="font-medium text-foreground">{email}</span></p>
-              </div>
-              {error && <div className="rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div>}
-              <div className="flex justify-center">
-                <InputOTP maxLength={6} value={otp} onChange={setOtp}>
-                  <InputOTPGroup>
-                    {[0, 1, 2, 3, 4, 5].map((i) => (
-                      <InputOTPSlot key={i} index={i} />
-                    ))}
-                  </InputOTPGroup>
-                </InputOTP>
-              </div>
-              <Button onClick={handleVerifyOTP} className="w-full" disabled={loading}>
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />Verifying...
-                  </>
-                ) : (
-                  "Verify & Continue"
-                )}
-              </Button>
-              <p className="text-sm text-muted-foreground">
-                {countdown > 0 ? (
-                  `Resend in ${countdown}s`
-                ) : (
-                  <button onClick={resendOtp} className="text-accent hover:underline font-medium" disabled={loading}>
-                    Resend code
-                  </button>
-                )}
-              </p>
-            </div>
-          )}
-
-          {step === "success" && (
-            <div className="text-center space-y-6">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-success/10">
-                <CheckCircle2 className="h-8 w-8 text-success" />
-              </div>
-              <div>
-                <h2 className="text-2xl font-bold text-foreground">You&apos;re all set!</h2>
-                <p className="text-muted-foreground mt-1">Your account has been verified successfully.</p>
-              </div>
-              <Button onClick={() => navigate("/dashboard")} className="w-full">Go to Dashboard</Button>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+  return (
+    <AuthLayout
+      title={step === "info" ? "Create your account" : step === "otp" ? "Email verification" : "All set"}
+      subtitle={
+        step === "info"
+          ? "Join your campus marketplace as a freelancer or job poster."
+          : step === "otp"
+            ? "Secure your account by confirming your one-time code."
+            : "You're ready to start using CFMS."
+      }
+      footer={
+        step === "info" ? (
+          <p className="text-center">
+            Already registered?{" "}
+            <Link to="/login" className="font-semibold text-accent transition-colors hover:text-accent/80">
+              Sign in
+            </Link>
+          </p>
+        ) : null
+      }
+    >
+      {renderContent()}
+    </AuthLayout>
   );
 };
 

@@ -4,10 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Loader2, X } from "lucide-react";
+import { Loader2, X, BriefcaseBusiness } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
@@ -25,9 +24,9 @@ const CreateJob = () => {
   const { user } = useAuth();
 
   const addSkill = () => {
-    const s = skillInput.trim();
-    if (s && !skills.includes(s)) {
-      setSkills([...skills, s]);
+    const value = skillInput.trim();
+    if (value && !skills.includes(value)) {
+      setSkills((prev) => [...prev, value]);
       setSkillInput("");
     }
   };
@@ -36,7 +35,7 @@ const CreateJob = () => {
     e.preventDefault();
 
     if (!title || !description || !budget || !deadline) {
-      toast({ title: "Missing Fields", description: "Please fill in all required fields.", variant: "destructive" });
+      toast({ title: "Missing fields", description: "Fill all required fields.", variant: "destructive" });
       return;
     }
 
@@ -50,7 +49,7 @@ const CreateJob = () => {
         deadline,
         deliverables,
       });
-      toast({ title: "Job Posted", description: "Your job has been published successfully." });
+      toast({ title: "Job posted", description: "Your listing is now live." });
       navigate("/jobs");
     } catch (err) {
       toast({
@@ -66,8 +65,8 @@ const CreateJob = () => {
   if (user?.role !== "poster") {
     return (
       <DashboardLayout title="Post a Job">
-        <div className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">
-          Switch to poster role to create a job.
+        <div className="rounded-2xl border border-border/70 bg-card p-8 text-sm text-muted-foreground">
+          Switch to poster role from the top bar to create job listings.
         </div>
       </DashboardLayout>
     );
@@ -75,72 +74,107 @@ const CreateJob = () => {
 
   return (
     <DashboardLayout title="Post a Job">
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="max-w-2xl">
-        <div className="rounded-xl border border-border bg-card p-6">
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="space-y-2">
-              <Label>Job Title *</Label>
-              <Input placeholder="e.g., Design Club Event Poster" value={title} onChange={(e) => setTitle(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Description *</Label>
-              <Textarea placeholder="Describe the job in detail..." value={description} onChange={(e) => setDescription(e.target.value)} rows={5} />
-            </div>
-            <div className="space-y-2">
-              <Label>Required Skills</Label>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Add a skill..."
-                  value={skillInput}
-                  onChange={(e) => setSkillInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      addSkill();
-                    }
-                  }}
-                />
-                <Button type="button" variant="outline" onClick={addSkill}>Add</Button>
-              </div>
-              {skills.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {skills.map((s) => (
-                    <span key={s} className="inline-flex items-center gap-1 rounded-full bg-accent/10 px-3 py-1 text-xs font-medium text-accent">
-                      {s}
-                      <button type="button" onClick={() => setSkills(skills.filter((x) => x !== s))}>
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Budget (₹) *</Label>
-                <Input type="number" placeholder="500" value={budget} onChange={(e) => setBudget(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>Deadline *</Label>
-                <Input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Deliverables</Label>
-              <Textarea placeholder="What should the freelancer deliver?" value={deliverables} onChange={(e) => setDeliverables(e.target.value)} rows={3} />
-            </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />Posting...
-                </>
-              ) : (
-                "Post Job"
-              )}
-            </Button>
-          </form>
+      <div className="mx-auto max-w-3xl rounded-3xl border border-border/70 bg-card/95 p-6 shadow-sm sm:p-8">
+        <div className="mb-7 flex items-start gap-3">
+          <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-accent/10 text-accent">
+            <BriefcaseBusiness className="h-5 w-5" />
+          </span>
+          <div>
+            <h2 className="display-font text-2xl font-semibold text-foreground">Create a new listing</h2>
+            <p className="text-sm text-muted-foreground">
+              Define scope, skills, budget, and deadline so freelancers can apply quickly.
+            </p>
+          </div>
         </div>
-      </motion.div>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-2">
+            <Label>Job Title *</Label>
+            <Input
+              placeholder="e.g., Design brochure for coding club"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Description *</Label>
+            <Textarea
+              placeholder="Describe expectations, context, and acceptance criteria"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={6}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Required Skills</Label>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Input
+                placeholder="Add skill and press Enter"
+                value={skillInput}
+                onChange={(e) => setSkillInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addSkill();
+                  }
+                }}
+              />
+              <Button type="button" variant="outline" onClick={addSkill}>
+                Add Skill
+              </Button>
+            </div>
+
+            {skills.length > 0 ? (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {skills.map((skill) => (
+                  <span
+                    key={skill}
+                    className="inline-flex items-center gap-1 rounded-full border border-accent/30 bg-accent/10 px-3 py-1 text-xs font-semibold text-accent"
+                  >
+                    {skill}
+                    <button type="button" onClick={() => setSkills((prev) => prev.filter((value) => value !== skill))}>
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Budget (₹) *</Label>
+              <Input type="number" placeholder="2000" value={budget} onChange={(e) => setBudget(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Deadline *</Label>
+              <Input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Deliverables</Label>
+            <Textarea
+              placeholder="Mention what needs to be delivered"
+              value={deliverables}
+              onChange={(e) => setDeliverables(e.target.value)}
+              rows={4}
+            />
+          </div>
+
+          <Button type="submit" className="w-full" disabled={loading}>
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" /> Publishing
+              </>
+            ) : (
+              "Publish Job"
+            )}
+          </Button>
+        </form>
+      </div>
     </DashboardLayout>
   );
 };

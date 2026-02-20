@@ -11,9 +11,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 import type { Job } from "@/types/cfms";
-import { Calendar, DollarSign, ArrowLeft, Loader2, FileText } from "lucide-react";
+import { Calendar, DollarSign, ArrowLeft, Loader2, FileText, UserRound } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { motion } from "framer-motion";
 
 const JobDetails = () => {
   const { id } = useParams();
@@ -52,8 +51,7 @@ const JobDetails = () => {
   const isPoster = Boolean(job && user?.id === job.poster.id);
 
   const handleApply = async () => {
-    if (!job) return;
-    if (!approach || !timeline || !quote) return;
+    if (!job || !approach || !timeline || !quote) return;
 
     setSubmitting(true);
     try {
@@ -62,7 +60,7 @@ const JobDetails = () => {
         timeline,
         quote: Number(quote),
       });
-      toast({ title: "Proposal Submitted", description: "Your proposal has been sent to the poster." });
+      toast({ title: "Proposal submitted", description: "Your proposal has been sent to the poster." });
       setApproach("");
       setTimeline("");
       setQuote("");
@@ -84,7 +82,7 @@ const JobDetails = () => {
 
     try {
       const data = await api.jobs.updateProposalStatus(job.id, proposalId, action);
-      toast({ title: action === "accept" ? "Proposal Accepted" : "Proposal Rejected" });
+      toast({ title: action === "accept" ? "Proposal accepted" : "Proposal rejected" });
 
       if (action === "accept" && data.workspaceId) {
         navigate(`/workspace/${data.workspaceId}`);
@@ -104,7 +102,7 @@ const JobDetails = () => {
   if (loading) {
     return (
       <DashboardLayout title="Job Details">
-        <p className="text-sm text-muted-foreground">Loading job...</p>
+        <div className="rounded-2xl border border-border/70 bg-card p-8 text-sm text-muted-foreground">Loading job details...</div>
       </DashboardLayout>
     );
   }
@@ -112,10 +110,12 @@ const JobDetails = () => {
   if (!job) {
     return (
       <DashboardLayout title="Job Not Found">
-        <div className="flex flex-col items-center justify-center py-20">
-          <FileText className="h-12 w-12 text-muted-foreground/30 mb-4" />
-          <p className="text-muted-foreground">{error || "This job doesn't exist."}</p>
-          <Link to="/jobs" className="mt-4 text-accent hover:underline text-sm">Back to Jobs</Link>
+        <div className="rounded-2xl border border-border/70 bg-card p-10 text-center">
+          <FileText className="mx-auto mb-4 h-10 w-10 text-muted-foreground/45" />
+          <p className="text-muted-foreground">{error || "This job does not exist."}</p>
+          <Link to="/jobs" className="mt-4 inline-flex text-sm font-semibold text-accent hover:text-accent/80">
+            Back to Jobs
+          </Link>
         </div>
       </DashboardLayout>
     );
@@ -125,122 +125,141 @@ const JobDetails = () => {
 
   return (
     <DashboardLayout title="Job Details">
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-        <Link to="/jobs" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-6">
-          <ArrowLeft className="h-4 w-4" />Back to Jobs
-        </Link>
+      <Link to="/jobs" className="mb-5 inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground">
+        <ArrowLeft className="h-4 w-4" /> Back to Jobs
+      </Link>
 
-        {error && (
-          <div className="mb-4 rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            {error}
-          </div>
-        )}
+      {error ? (
+        <div className="mb-5 rounded-2xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {error}
+        </div>
+      ) : null}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-            <div className="rounded-xl border border-border bg-card p-6">
-              <div className="flex items-start justify-between mb-4">
-                <h2 className="text-xl font-bold text-card-foreground">{job.title}</h2>
-                <StatusBadge status={job.status} />
-              </div>
-              <p className="text-muted-foreground mb-6 leading-relaxed">{job.description}</p>
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-sm font-semibold text-card-foreground mb-2">Required Skills</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {job.skills.map((s) => (
-                      <span key={s} className="rounded-full bg-secondary px-3 py-1 text-xs font-medium text-secondary-foreground">{s}</span>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-card-foreground mb-1">Deliverables</h3>
-                  <p className="text-sm text-muted-foreground">{job.deliverables || "No deliverables specified."}</p>
-                </div>
-              </div>
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <div className="space-y-6 xl:col-span-2">
+          <section className="rounded-3xl border border-border/70 bg-card/95 p-6 shadow-sm">
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+              <h2 className="display-font text-2xl font-semibold text-card-foreground">{job.title}</h2>
+              <StatusBadge status={job.status} />
             </div>
 
-            {isPoster && job.applicants.length > 0 && (
+            <p className="mb-6 text-sm leading-relaxed text-muted-foreground">{job.description}</p>
+
+            <div className="space-y-5">
               <div>
-                <h3 className="text-lg font-semibold text-foreground mb-4">Proposals ({job.applicants.length})</h3>
-                <div className="space-y-4">
-                  {job.applicants.map((p) => (
-                    <ProposalCard
-                      key={p.id}
-                      proposal={p}
-                      showActions
-                      onAccept={() => handleProposalAction(p.id, "accept")}
-                      onReject={() => handleProposalAction(p.id, "reject")}
-                    />
+                <h3 className="mb-2 text-sm font-semibold text-card-foreground">Required skills</h3>
+                <div className="flex flex-wrap gap-2">
+                  {job.skills.map((skill) => (
+                    <span
+                      key={skill}
+                      className="rounded-full border border-secondary-foreground/15 bg-secondary px-3 py-1 text-xs font-semibold text-secondary-foreground"
+                    >
+                      {skill}
+                    </span>
                   ))}
                 </div>
               </div>
-            )}
-          </div>
 
-          <div className="space-y-4">
-            <div className="rounded-xl border border-border bg-card p-5 space-y-4">
-              <div className="flex items-center gap-2 text-sm">
+              <div>
+                <h3 className="mb-1 text-sm font-semibold text-card-foreground">Deliverables</h3>
+                <p className="text-sm text-muted-foreground">{job.deliverables || "No deliverables specified."}</p>
+              </div>
+            </div>
+          </section>
+
+          {isPoster && job.applicants.length > 0 ? (
+            <section>
+              <h3 className="mb-4 display-font text-xl font-semibold text-foreground">Proposals ({job.applicants.length})</h3>
+              <div className="space-y-4">
+                {job.applicants.map((proposal) => (
+                  <ProposalCard
+                    key={proposal.id}
+                    proposal={proposal}
+                    showActions
+                    onAccept={() => handleProposalAction(proposal.id, "accept")}
+                    onReject={() => handleProposalAction(proposal.id, "reject")}
+                  />
+                ))}
+              </div>
+            </section>
+          ) : null}
+        </div>
+
+        <aside className="space-y-4">
+          <section className="rounded-3xl border border-border/70 bg-card/95 p-5 shadow-sm">
+            <div className="space-y-3 text-sm">
+              <div className="flex items-center gap-2">
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
                 <span className="text-muted-foreground">Budget</span>
                 <span className="ml-auto font-semibold text-card-foreground">₹{job.budget}</span>
               </div>
-              <div className="flex items-center gap-2 text-sm">
+              <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 <span className="text-muted-foreground">Deadline</span>
                 <span className="ml-auto font-semibold text-card-foreground">{job.deadline}</span>
               </div>
-              <div className="border-t border-border pt-4">
-                <p className="text-xs text-muted-foreground mb-1">Posted by</p>
-                <div className="flex items-center gap-2">
-                  <img src={job.poster.avatar} alt="" className="h-8 w-8 rounded-full bg-secondary" />
-                  <div>
-                    <p className="text-sm font-medium text-card-foreground">{job.poster.name}</p>
-                    <p className="text-xs text-muted-foreground">{job.poster.branch || "Campus Student"}</p>
-                  </div>
+            </div>
+
+            <div className="mt-4 border-t border-border/70 pt-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.03em] text-muted-foreground">Posted by</p>
+              <div className="mt-2 flex items-center gap-2.5">
+                {job.poster.avatar ? (
+                  <img src={job.poster.avatar} alt="Poster avatar" className="h-9 w-9 rounded-xl bg-secondary object-cover" />
+                ) : (
+                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-secondary text-secondary-foreground">
+                    <UserRound className="h-4 w-4" />
+                  </span>
+                )}
+                <div>
+                  <p className="text-sm font-semibold text-card-foreground">{job.poster.name}</p>
+                  <p className="text-xs text-muted-foreground">{job.poster.branch || "Campus student"}</p>
                 </div>
               </div>
-
-              {canApply && (
-                <Dialog open={applyOpen} onOpenChange={setApplyOpen}>
-                  <DialogTrigger asChild>
-                    <Button className="w-full">Apply Now</Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Submit Proposal</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 mt-2">
-                      <div className="space-y-2">
-                        <Label>Your Approach</Label>
-                        <Textarea placeholder="Describe how you'll complete this job..." value={approach} onChange={(e) => setApproach(e.target.value)} rows={4} />
-                        <p className="text-xs text-muted-foreground text-right">{approach.length}/500</p>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Estimated Timeline</Label>
-                        <Input placeholder="e.g., 7 days" value={timeline} onChange={(e) => setTimeline(e.target.value)} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Your Quote (₹)</Label>
-                        <Input type="number" placeholder="Enter your price" value={quote} onChange={(e) => setQuote(e.target.value)} />
-                      </div>
-                      <Button onClick={handleApply} className="w-full" disabled={submitting}>
-                        {submitting ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />Submitting...
-                          </>
-                        ) : (
-                          "Submit Proposal"
-                        )}
-                      </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              )}
             </div>
-          </div>
-        </div>
-      </motion.div>
+
+            {canApply ? (
+              <Dialog open={applyOpen} onOpenChange={setApplyOpen}>
+                <DialogTrigger asChild>
+                  <Button className="mt-5 w-full">Apply Now</Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Submit Proposal</DialogTitle>
+                  </DialogHeader>
+                  <div className="mt-2 space-y-4">
+                    <div className="space-y-2">
+                      <Label>Your approach</Label>
+                      <Textarea
+                        placeholder="Explain how you will complete the task"
+                        value={approach}
+                        onChange={(e) => setApproach(e.target.value)}
+                        rows={4}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Timeline</Label>
+                      <Input placeholder="e.g., 7 days" value={timeline} onChange={(e) => setTimeline(e.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Quote (₹)</Label>
+                      <Input type="number" placeholder="Your quote" value={quote} onChange={(e) => setQuote(e.target.value)} />
+                    </div>
+                    <Button onClick={handleApply} className="w-full" disabled={submitting}>
+                      {submitting ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" /> Submitting
+                        </>
+                      ) : (
+                        "Submit Proposal"
+                      )}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            ) : null}
+          </section>
+        </aside>
+      </div>
     </DashboardLayout>
   );
 };

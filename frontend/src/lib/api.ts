@@ -7,6 +7,7 @@ import type {
   User,
   Workspace,
 } from "@/types/cfms";
+import { markBackendReachable, markBackendUnreachable } from "@/lib/connection";
 
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 
@@ -41,6 +42,9 @@ const resolveApiBaseUrl = () => {
 
 const API_BASE_URL = resolveApiBaseUrl();
 const TOKEN_KEY = "cfms_token";
+const MAX_RETRIES = 2;
+const RETRYABLE_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
+const BASE_RETRY_DELAY_MS = 300;
 
 type ApiEnvelope<T> = {
   success: boolean;
@@ -84,6 +88,8 @@ const buildUrl = (path: string, params?: Record<string, string | number | boolea
   return url.toString();
 };
 
+const sleep = (ms: number) => new Promise((resolve) => globalThis.setTimeout(resolve, ms));
+
 const request = async <T>(
   path: string,
   { method = "GET", body, token, skipAuthRedirect = false }: RequestOptions = {},
@@ -91,43 +97,98 @@ const request = async <T>(
 ): Promise<T> => {
   const resolvedToken = token ?? authStorage.getToken();
   const requestUrl = buildUrl(path, params);
+  const maxAttempts = MAX_RETRIES + 1;
+  const canRetryThisRequest = method === "GET";
 
-  let response: Response;
-  try {
-    response = await fetch(requestUrl, {
-      method,
-      headers: {
-        "Content-Type": "application/json",
-        ...(resolvedToken ? { Authorization: `Bearer ${resolvedToken}` } : {}),
-      },
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
-  } catch {
-    throw new HttpError(
-      0,
-      `Unable to reach backend at ${requestUrl}. Make sure the backend server is running, VITE_API_URL is correct, and CORS allows your frontend origin.`
-    );
-  }
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    let response: Response;
 
-  let payload: ApiEnvelope<T> | null = null;
-  try {
-    payload = (await response.json()) as ApiEnvelope<T>;
-  } catch {
-    payload = null;
-  }
+    try {
+      response = await fetch(requestUrl, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          ...(resolvedToken ? { Authorization: `Bearer ${resolvedToken}` } : {}),
+        },
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+      });
+      markBackendReachable();
+    } catch {
+      markBackendUnreachable();
 
-  if (!response.ok || !payload?.success) {
-    const message = payload?.message || `Request failed with status ${response.status}`;
+      if (canRetryThisRequest && attempt < maxAttempts - 1) {
+        await sleep(BASE_RETRY_DELAY_MS * (attempt + 1));
+        continue;
+      }
 
-    if (response.status === 401 && !skipAuthRedirect) {
-      authStorage.clearToken();
-      window.dispatchEvent(new CustomEvent("cfms:unauthorized"));
+      throw new HttpError(
+        0,
+        `Unable to reach backend at ${requestUrl}. Make sure the backend server is running, VITE_API_URL is correct, and CORS allows your frontend origin.`
+      );
     }
 
-    throw new HttpError(response.status, message, payload?.data ?? null);
+    let payload: ApiEnvelope<T> | null = null;
+    try {
+      payload = (await response.json()) as ApiEnvelope<T>;
+    } catch {
+      payload = null;
+    }
+
+    if (response.status >= 500) {
+      markBackendUnreachable();
+    }
+
+    const failedRequest = !response.ok || !payload?.success;
+    const canRetry =
+      canRetryThisRequest && RETRYABLE_STATUSES.has(response.status) && attempt < maxAttempts - 1;
+    if (failedRequest && canRetry) {
+      await sleep(BASE_RETRY_DELAY_MS * (attempt + 1));
+      continue;
+    }
+
+    if (failedRequest) {
+      const message = payload?.message || `Request failed with status ${response.status}`;
+
+      if (response.status === 401 && !skipAuthRedirect) {
+        authStorage.clearToken();
+        window.dispatchEvent(new CustomEvent("cfms:unauthorized"));
+      }
+
+      throw new HttpError(response.status, message, payload?.data ?? null);
+    }
+
+    return payload.data;
   }
 
-  return payload.data;
+  throw new HttpError(0, `Request failed after ${maxAttempts} attempts.`);
+};
+
+export const pingBackend = async (signal?: AbortSignal) => {
+  const healthUrl = buildUrl("/health");
+
+  try {
+    const response = await fetch(healthUrl, {
+      method: "GET",
+      signal,
+    });
+
+    if (!response.ok) {
+      markBackendUnreachable();
+      return false;
+    }
+
+    const payload = (await response.json().catch(() => null)) as ApiEnvelope<{ uptime: number }> | null;
+    if (!payload?.success) {
+      markBackendUnreachable();
+      return false;
+    }
+
+    markBackendReachable();
+    return true;
+  } catch {
+    markBackendUnreachable();
+    return false;
+  }
 };
 
 export const api = {

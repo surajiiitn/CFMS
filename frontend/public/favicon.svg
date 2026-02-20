@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="cfms-bg" x1="8" y1="6" x2="56" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#114870"/>
+      <stop offset="1" stop-color="#E66C1D"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="url(#cfms-bg)"/>
+  <path d="M45.5 20H24.5C20.4 20 17 23.4 17 27.5V36.5C17 40.6 20.4 44 24.5 44H39.5C43.6 44 47 40.6 47 36.5V26.5L37.5 36H25.5V32H36L45.5 22.5V20Z" fill="#FFF7EE"/>
+</svg>

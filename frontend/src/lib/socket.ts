@@ -1,5 +1,11 @@
 import { io, Socket } from "socket.io-client";
 import type { ChatMsg } from "@/types/cfms";
+import {
+  markBackendReachable,
+  markBackendUnreachable,
+  setSocketConnected,
+  setSocketExpected,
+} from "@/lib/connection";
 
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 
@@ -49,15 +55,52 @@ const socketUrl = resolveSocketUrl();
 
 let socket: Socket | null = null;
 
+const bindConnectionEvents = (targetSocket: Socket) => {
+  targetSocket.off("connect");
+  targetSocket.off("disconnect");
+  targetSocket.off("connect_error");
+
+  targetSocket.on("connect", () => {
+    setSocketConnected(true);
+    markBackendReachable();
+  });
+
+  targetSocket.on("disconnect", () => {
+    setSocketConnected(false);
+  });
+
+  targetSocket.on("connect_error", () => {
+    setSocketConnected(false);
+    markBackendUnreachable();
+  });
+};
+
 export const getSocket = () => socket;
 
 export const connectSocket = (token: string) => {
-  if (socket?.connected) return socket;
+  setSocketExpected(true);
+
+  if (socket) {
+    socket.auth = { token };
+
+    if (!socket.connected) {
+      socket.connect();
+    }
+
+    return socket;
+  }
 
   socket = io(socketUrl, {
     auth: { token },
     transports: ["websocket", "polling"],
+    reconnection: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 10000,
+    timeout: 15000,
   });
+
+  bindConnectionEvents(socket);
 
   return socket;
 };
@@ -65,6 +108,7 @@ export const connectSocket = (token: string) => {
 export const disconnectSocket = () => {
   if (socket) {
     socket.disconnect();
+    setSocketExpected(false);
     socket = null;
   }
 };

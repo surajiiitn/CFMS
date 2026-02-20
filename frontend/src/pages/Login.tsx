@@ -4,7 +4,8 @@ import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, GraduationCap } from "lucide-react";
+import { Loader2, Mail, LockKeyhole } from "lucide-react";
+import { AuthLayout } from "@/components/layout/AuthLayout";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -35,72 +36,66 @@ const Login = () => {
   };
 
   return (
-    <div className="flex min-h-screen">
-      <div className="hidden lg:flex lg:w-1/2 auth-gradient items-center justify-center p-12">
-        <div className="max-w-md text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-accent/20 mb-8">
-            <GraduationCap className="h-8 w-8 text-accent-foreground" />
+    <AuthLayout
+      title="Welcome back"
+      subtitle="Sign in to continue managing jobs, proposals, and workspace activity."
+      footer={
+        <p className="text-center">
+          New here?{" "}
+          <Link to="/register" className="font-semibold text-accent transition-colors hover:text-accent/80">
+            Create account
+          </Link>
+        </p>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-5">
+        {error ? (
+          <div className="rounded-2xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {error}
           </div>
-          <h1 className="text-3xl font-bold text-primary-foreground mb-4">Campus Freelance</h1>
-          <p className="text-primary-foreground/70 text-lg">
-            Connect with talented students. Post micro-jobs. Get things done - all within your campus.
-          </p>
-        </div>
-      </div>
+        ) : null}
 
-      <div className="flex w-full lg:w-1/2 items-center justify-center p-8">
-        <div className="w-full max-w-md space-y-8">
-          <div>
-            <h2 className="text-2xl font-bold text-foreground">Welcome back</h2>
-            <p className="text-muted-foreground mt-1">Sign in to your account</p>
+        <div className="space-y-2">
+          <Label htmlFor="email">College Email</Label>
+          <div className="relative">
+            <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              id="email"
+              type="email"
+              placeholder="you@college.edu"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="pl-10"
+            />
           </div>
-
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {error && (
-              <div className="rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="email">College Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@college.edu"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password">Password</Label>
-              </div>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />Signing in...
-                </>
-              ) : (
-                "Sign In"
-              )}
-            </Button>
-          </form>
-
-          <p className="text-center text-sm text-muted-foreground">
-            Don&apos;t have an account?{" "}
-            <Link to="/register" className="font-medium text-accent hover:underline">
-              Sign up
-            </Link>
-          </p>
         </div>
-      </div>
-    </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="password">Password</Label>
+          <div className="relative">
+            <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              id="password"
+              type="password"
+              placeholder="Enter your password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        </div>
+
+        <Button type="submit" className="w-full" disabled={loading}>
+          {loading ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" /> Signing in
+            </>
+          ) : (
+            "Sign In"
+          )}
+        </Button>
+      </form>
+    </AuthLayout>
   );
 };
 

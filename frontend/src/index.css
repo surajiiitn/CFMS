@@ -1,77 +1,131 @@
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 220 25% 97%;
-    --foreground: 222 47% 11%;
+    --background: 40 40% 98%;
+    --foreground: 213 42% 14%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 213 42% 14%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover-foreground: 213 42% 14%;
 
-    --primary: 220 55% 18%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 207 72% 20%;
+    --primary-foreground: 45 90% 97%;
 
-    --secondary: 220 14% 93%;
-    --secondary-foreground: 222 47% 11%;
+    --secondary: 200 32% 94%;
+    --secondary-foreground: 213 37% 23%;
 
-    --muted: 220 14% 93%;
-    --muted-foreground: 220 9% 46%;
+    --muted: 206 28% 93%;
+    --muted-foreground: 215 16% 40%;
 
-    --accent: 217 91% 60%;
+    --accent: 21 92% 54%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84% 60%;
+    --destructive: 6 84% 57%;
     --destructive-foreground: 0 0% 100%;
 
-    --success: 152 58% 42%;
+    --success: 158 68% 35%;
     --success-foreground: 0 0% 100%;
 
-    --warning: 38 92% 50%;
-    --warning-foreground: 30 80% 15%;
+    --warning: 34 93% 52%;
+    --warning-foreground: 25 64% 14%;
 
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 217 91% 60%;
+    --border: 210 24% 86%;
+    --input: 210 26% 85%;
+    --ring: 21 92% 54%;
 
-    --radius: 0.75rem;
+    --radius: 1rem;
 
-    --sidebar-background: 220 55% 18%;
-    --sidebar-foreground: 220 20% 90%;
-    --sidebar-primary: 217 91% 60%;
+    --sidebar-background: 209 78% 14%;
+    --sidebar-foreground: 42 80% 96%;
+    --sidebar-primary: 21 92% 54%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 50% 24%;
-    --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 220 40% 25%;
-    --sidebar-ring: 217 91% 60%;
+    --sidebar-accent: 208 62% 22%;
+    --sidebar-accent-foreground: 40 86% 95%;
+    --sidebar-border: 210 42% 28%;
+    --sidebar-ring: 21 92% 54%;
   }
-}
 
-@layer base {
   * {
     @apply border-border;
   }
 
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background-image: radial-gradient(circle at 15% 18%, hsl(204 90% 95%) 0, transparent 40%),
+      radial-gradient(circle at 82% 86%, hsl(25 100% 93%) 0, transparent 42%),
+      linear-gradient(180deg, hsl(var(--background)) 0%, hsl(206 40% 96%) 100%);
+    background-attachment: fixed;
+    font-family: "Manrope", sans-serif;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: "Sora", "Manrope", sans-serif;
+    letter-spacing: -0.015em;
+  }
+
+  ::selection {
+    background: hsl(var(--accent) / 0.22);
+  }
+}
+
+@layer components {
+  .app-shell-bg {
+    background-image: radial-gradient(circle at 16% 18%, hsl(204 90% 95%) 0, transparent 43%),
+      radial-gradient(circle at 84% 84%, hsl(23 100% 92%) 0, transparent 46%),
+      linear-gradient(180deg, hsl(205 40% 97%) 0, hsl(var(--background)) 100%);
+  }
+
+  .display-font {
+    font-family: "Sora", "Manrope", sans-serif;
+  }
+
+  .glass-panel {
+    background: linear-gradient(165deg, hsl(0 0% 100% / 0.92) 0%, hsl(200 45% 97% / 0.8) 100%);
+    box-shadow: 0 20px 60px -36px hsl(207 72% 20% / 0.5);
+    backdrop-filter: blur(10px);
+  }
+
+  .card-hover {
+    @apply transition-all duration-300;
+  }
+
+  .card-hover:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 24px 40px -28px hsl(208 65% 21% / 0.38);
   }
 }
 
 @layer utilities {
-  .auth-gradient {
-    background: linear-gradient(135deg, hsl(220 55% 18%) 0%, hsl(217 91% 40%) 50%, hsl(220 55% 18%) 100%);
+  .page-enter {
+    animation: page-enter 320ms ease-out;
   }
+}
 
-  .card-hover {
-    @apply transition-all duration-200 ease-out;
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
   }
-
-  .card-hover:hover {
-    @apply shadow-lg -translate-y-0.5;
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }

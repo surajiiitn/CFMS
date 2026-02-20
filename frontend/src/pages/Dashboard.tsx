@@ -4,18 +4,18 @@ import { useAuth } from "@/context/AuthContext";
 import { JobCard } from "@/components/JobCard";
 import { api } from "@/lib/api";
 import type { Job } from "@/types/cfms";
-import { Briefcase, DollarSign, CheckCircle, Clock, FileText, TrendingUp } from "lucide-react";
-import { motion } from "framer-motion";
+import type { LucideIcon } from "lucide-react";
+import { Briefcase, DollarSign, CheckCircle, Clock, FileText, TrendingUp, Sparkles } from "lucide-react";
 
-const StatCard = ({ icon: Icon, label, value, color }: { icon: any; label: string; value: string; color: string }) => (
-  <div className="rounded-xl border border-border bg-card p-5">
+const StatCard = ({ icon: Icon, label, value, color }: { icon: LucideIcon; label: string; value: string; color: string }) => (
+  <div className="rounded-2xl border border-border/70 bg-card/95 p-5 shadow-sm">
     <div className="flex items-center gap-3">
-      <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${color}`}>
+      <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${color}`}>
         <Icon className="h-5 w-5" />
       </div>
       <div>
-        <p className="text-sm text-muted-foreground">{label}</p>
-        <p className="text-2xl font-bold text-card-foreground">{value}</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.03em] text-muted-foreground">{label}</p>
+        <p className="display-font text-2xl font-bold text-card-foreground">{value}</p>
       </div>
     </div>
   </div>
@@ -52,13 +52,13 @@ const Dashboard = () => {
     () =>
       isPoster
         ? [
-            { icon: Briefcase, label: "Jobs Posted", value: String(stats.jobsPosted || 0), color: "bg-accent/10 text-accent" },
+            { icon: Briefcase, label: "Jobs Posted", value: String(stats.jobsPosted || 0), color: "bg-accent/15 text-accent" },
             { icon: FileText, label: "Proposals", value: String(stats.proposalsCount || 0), color: "bg-primary/10 text-primary" },
             { icon: Clock, label: "Active", value: String(stats.active || 0), color: "bg-warning/10 text-warning" },
             { icon: CheckCircle, label: "Completed", value: String(stats.completed || 0), color: "bg-success/10 text-success" },
           ]
         : [
-            { icon: Briefcase, label: "Available Jobs", value: String(stats.availableJobs || 0), color: "bg-accent/10 text-accent" },
+            { icon: Briefcase, label: "Open Jobs", value: String(stats.availableJobs || 0), color: "bg-accent/15 text-accent" },
             { icon: FileText, label: "My Proposals", value: String(stats.myProposals || 0), color: "bg-primary/10 text-primary" },
             { icon: TrendingUp, label: "Active Gigs", value: String(stats.activeGigs || 0), color: "bg-warning/10 text-warning" },
             { icon: DollarSign, label: "Earned", value: `₹${stats.earned || 0}`, color: "bg-success/10 text-success" },
@@ -68,41 +68,58 @@ const Dashboard = () => {
 
   return (
     <DashboardLayout title="Dashboard">
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-        <p className="text-muted-foreground mb-6">
-          Welcome back, <span className="font-medium text-foreground">{user?.name}</span>
-          <span className="ml-2 inline-flex items-center rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">
-            {isPoster ? "Job Poster" : "Freelancer"}
+      <section className="mb-7 overflow-hidden rounded-3xl border border-primary/20 bg-primary px-6 py-7 text-primary-foreground shadow-xl sm:px-8">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white/15">
+            <Sparkles className="h-5 w-5" />
           </span>
-        </p>
+          <div>
+            <h2 className="display-font text-2xl font-bold">Welcome, {user?.name}</h2>
+            <p className="text-sm text-primary-foreground/80">
+              {isPoster
+                ? "Track job responses and move accepted work into workspace."
+                : "Discover opportunities and keep active gigs on schedule."}
+            </p>
+          </div>
+          <span className="ml-auto rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.03em]">
+            {isPoster ? "Poster Mode" : "Freelancer Mode"}
+          </span>
+        </div>
+      </section>
 
-        {error && (
-          <div className="mb-4 rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            {error}
+      {error ? (
+        <div className="mb-5 rounded-2xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {error}
+        </div>
+      ) : null}
+
+      <section className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {statCards.map((item) => (
+          <StatCard key={item.label} {...item} />
+        ))}
+      </section>
+
+      <section>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h3 className="display-font text-xl font-semibold text-foreground">
+            {isPoster ? "Recent jobs" : "Recommended jobs"}
+          </h3>
+        </div>
+
+        {loading ? (
+          <div className="rounded-2xl border border-border/70 bg-card p-8 text-sm text-muted-foreground">Loading jobs...</div>
+        ) : recentJobs.length > 0 ? (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {recentJobs.map((job) => (
+              <JobCard key={job.id} job={job} />
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-border/70 bg-card p-8 text-sm text-muted-foreground">
+            No jobs available yet.
           </div>
         )}
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {statCards.map((s) => (
-            <StatCard key={s.label} {...s} />
-          ))}
-        </div>
-
-        <div>
-          <h2 className="text-lg font-semibold text-foreground mb-4">
-            {isPoster ? "Your Recent Jobs" : "Available Jobs"}
-          </h2>
-          {loading ? (
-            <p className="text-sm text-muted-foreground">Loading jobs...</p>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {recentJobs.map((job) => (
-                <JobCard key={job.id} job={job} />
-              ))}
-            </div>
-          )}
-        </div>
-      </motion.div>
+      </section>
     </DashboardLayout>
   );
 };

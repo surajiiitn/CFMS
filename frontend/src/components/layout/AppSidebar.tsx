@@ -4,73 +4,153 @@ import {
   LayoutDashboard,
   Search,
   PlusCircle,
-  Briefcase,
-  FolderOpen,
+  FolderKanban,
   User,
   LogOut,
   ChevronLeft,
   ChevronRight,
+  GraduationCap,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 const navItems = [
-  { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
-  { label: "Browse Jobs", icon: Search, path: "/jobs" },
-  { label: "Post a Job", icon: PlusCircle, path: "/create-job" },
-  { label: "Workspace", icon: FolderOpen, path: "/workspace" },
-  { label: "Profile", icon: User, path: "/profile" },
-];
+  {
+    label: "Dashboard",
+    description: "Overview",
+    icon: LayoutDashboard,
+    path: "/dashboard",
+  },
+  {
+    label: "Browse Jobs",
+    description: "Find gigs",
+    icon: Search,
+    path: "/jobs",
+  },
+  {
+    label: "Post Job",
+    description: "Create listing",
+    icon: PlusCircle,
+    path: "/create-job",
+  },
+  {
+    label: "Workspace",
+    description: "Live progress",
+    icon: FolderKanban,
+    path: "/workspace",
+  },
+  {
+    label: "Profile",
+    description: "Your account",
+    icon: User,
+    path: "/profile",
+  },
+] as const;
 
-export const AppSidebar = ({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) => {
+type AppSidebarProps = {
+  collapsed: boolean;
+  mobileOpen: boolean;
+  onToggle: () => void;
+  onCloseMobile: () => void;
+};
+
+export const AppSidebar = ({ collapsed, mobileOpen, onToggle, onCloseMobile }: AppSidebarProps) => {
   const location = useLocation();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
 
   return (
     <aside
       className={cn(
-        "fixed left-0 top-0 z-40 flex h-screen flex-col bg-sidebar text-sidebar-foreground transition-all duration-300",
-        collapsed ? "w-16" : "w-60"
+        "fixed left-0 top-0 z-50 h-screen border-r border-sidebar-border/80 bg-sidebar text-sidebar-foreground shadow-2xl transition-all duration-300",
+        collapsed ? "w-24" : "w-72",
+        mobileOpen ? "translate-x-0" : "-translate-x-full",
+        "lg:translate-x-0"
       )}
     >
-      {/* Logo */}
-      <div className="flex h-16 items-center justify-between px-4 border-b border-sidebar-border">
-        {!collapsed && <span className="text-lg font-bold text-sidebar-primary-foreground tracking-tight">CFMS</span>}
-        <button onClick={onToggle} className="rounded-md p-1.5 text-sidebar-foreground/60 hover:text-sidebar-primary-foreground hover:bg-sidebar-accent transition-colors">
-          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-        </button>
-      </div>
+      <div className="flex h-full flex-col">
+        <div className="border-b border-sidebar-border/70 px-4 pb-4 pt-5">
+          <div className={cn("flex items-center", collapsed ? "justify-center" : "justify-between")}> 
+            <div className={cn("flex items-center gap-3", collapsed && "justify-center")}>
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground shadow-lg shadow-black/20">
+                <GraduationCap className="h-5 w-5" />
+              </div>
+              {!collapsed ? (
+                <div>
+                  <p className="display-font text-base font-semibold tracking-tight">CFMS</p>
+                  <p className="text-xs text-sidebar-foreground/70">Campus Freelance</p>
+                </div>
+              ) : null}
+            </div>
+            {!collapsed ? (
+              <button
+                type="button"
+                onClick={onToggle}
+                className="hidden rounded-lg p-2 text-sidebar-foreground/70 transition hover:bg-sidebar-accent hover:text-sidebar-accent-foreground lg:inline-flex"
+                aria-label="Collapse sidebar"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+            ) : null}
+          </div>
 
-      {/* Nav */}
-      <nav className="flex-1 px-3 py-4 space-y-1">
-        {navItems.map((item) => {
-          const active = location.pathname.startsWith(item.path);
-          return (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                active
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
-              )}
+          {collapsed ? (
+            <button
+              type="button"
+              onClick={onToggle}
+              className="mt-3 hidden w-full items-center justify-center rounded-lg p-2 text-sidebar-foreground/70 transition hover:bg-sidebar-accent hover:text-sidebar-accent-foreground lg:inline-flex"
+              aria-label="Expand sidebar"
             >
-              <item.icon className="h-5 w-5 shrink-0" />
-              {!collapsed && <span>{item.label}</span>}
-            </Link>
-          );
-        })}
-      </nav>
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          ) : null}
+        </div>
 
-      {/* Logout */}
-      <div className="px-3 pb-4">
-        <button
-          onClick={logout}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground transition-colors"
-        >
-          <LogOut className="h-5 w-5 shrink-0" />
-          {!collapsed && <span>Logout</span>}
-        </button>
+        <nav className="flex-1 space-y-1.5 overflow-y-auto px-3 py-4">
+          {navItems.map((item) => {
+            const active = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
+
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                onClick={onCloseMobile}
+                className={cn(
+                  "group flex items-center gap-3 rounded-xl px-3 py-3 transition-all",
+                  active
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                    : "text-sidebar-foreground/75 hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground"
+                )}
+                title={collapsed ? item.label : undefined}
+              >
+                <item.icon className="h-5 w-5 shrink-0" />
+                {!collapsed ? (
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold">{item.label}</p>
+                    <p className="truncate text-xs text-sidebar-foreground/60 group-hover:text-sidebar-accent-foreground/75">
+                      {item.description}
+                    </p>
+                  </div>
+                ) : null}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="border-t border-sidebar-border/70 p-3">
+          {!collapsed ? (
+            <div className="mb-3 rounded-xl border border-sidebar-border/80 bg-sidebar-accent/60 px-3 py-2">
+              <p className="truncate text-sm font-semibold">{user?.name || "User"}</p>
+              <p className="truncate text-xs text-sidebar-foreground/70">{user?.role === "poster" ? "Job Poster" : "Freelancer"}</p>
+            </div>
+          ) : null}
+          <button
+            type="button"
+            onClick={logout}
+            className="flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-sidebar-foreground/75 transition hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          >
+            <LogOut className="h-4 w-4 shrink-0" />
+            {!collapsed ? <span>Logout</span> : null}
+          </button>
+        </div>
       </div>
     </aside>
   );
