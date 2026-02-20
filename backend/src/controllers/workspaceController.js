@@ -42,6 +42,7 @@ const emitWorkspaceEvent = (workspaceId, event, payload) => {
 export const listMyWorkspaces = asyncHandler(async (req, res) => {
   const workspaces = await Workspace.find({
     $or: [{ poster: req.user._id }, { freelancer: req.user._id }],
+    status: "Active",
   })
     .populate("poster", userProjection)
     .populate("freelancer", userProjection)
@@ -51,14 +52,18 @@ export const listMyWorkspaces = asyncHandler(async (req, res) => {
     })
     .sort({ updatedAt: -1 });
 
-  const jobIds = workspaces.map((w) => w.job?._id).filter(Boolean);
+  const activeWorkspaces = workspaces.filter(
+    (workspace) => workspace.status === "Active" && workspace.job && workspace.job.status !== "Completed"
+  );
+
+  const jobIds = activeWorkspaces.map((w) => w.job?._id).filter(Boolean);
   const proposalCounts = await Proposal.aggregate([
     { $match: { job: { $in: jobIds } } },
     { $group: { _id: "$job", count: { $sum: 1 } } },
   ]);
   const countMap = new Map(proposalCounts.map((item) => [item._id.toString(), item.count]));
 
-  const items = workspaces.map((workspace) => {
+  const items = activeWorkspaces.map((workspace) => {
     const applicantsCount = workspace.job ? countMap.get(workspace.job._id.toString()) || 0 : 0;
     const serializedJob = workspace.job
       ? serializeJob(workspace.job, { applicants: [], applicantsCount })
@@ -291,5 +296,6 @@ export const approveWorkspaceSubmission = asyncHandler(async (req, res) => {
   return sendSuccess(res, 200, "Submission approved", {
     approvedAt: workspace.approvedAt,
     jobStatus: workspace.job.status,
+    workspaceRemoved: true,
   });
 });

@@ -47,6 +47,9 @@ const Workspace = () => {
         const list = await api.workspaces.listMine();
 
         if (list.workspaces.length === 0) {
+          if (id) {
+            navigate("/workspace", { replace: true });
+          }
           setWorkspace(null);
           setMessages([]);
           setLoading(false);
@@ -107,7 +110,7 @@ const Workspace = () => {
     };
 
     const onCompleted = () => {
-      refreshWorkspace(id).catch(() => null);
+      navigate("/workspace", { replace: true });
     };
 
     socket.on("connect", onSocketConnect);
@@ -123,7 +126,7 @@ const Workspace = () => {
       activeSocket?.off("workspace:completed", onCompleted);
       leaveWorkspaceRoom(id);
     };
-  }, [id, token, refreshWorkspace]);
+  }, [id, token, refreshWorkspace, navigate]);
 
   const sendMessage = async () => {
     if (!id || !message.trim()) return;
@@ -197,8 +200,12 @@ const Workspace = () => {
     if (!id) return;
 
     try {
-      await api.workspaces.approve(id);
+      const data = await api.workspaces.approve(id);
       toast({ title: "Submission approved", description: "Job marked as completed." });
+      if (data.workspaceRemoved) {
+        navigate("/workspace", { replace: true });
+        return;
+      }
       await refreshWorkspace(id);
     } catch (err) {
       toast({
@@ -239,6 +246,8 @@ const Workspace = () => {
   }
 
   const job = workspace.job;
+  const hasSubmission = Boolean(workspace.submission?.submittedAt && workspace.submission?.link);
+  const canFreelancerSubmit = isFreelancer && (job.status === "assigned" || job.status === "in-progress");
 
   return (
     <DashboardLayout title="Workspace">
@@ -345,40 +354,69 @@ const Workspace = () => {
           <div className="rounded-3xl border border-border/70 bg-card/95 p-5 shadow-sm">
             <h3 className="mb-3 text-sm font-semibold text-card-foreground">Submission</h3>
             <div className="space-y-3">
-              <Input
-                placeholder="Submission link or file URL"
-                value={submissionLink}
-                onChange={(e) => setSubmissionLink(e.target.value)}
-                disabled={Boolean(workspace.submission?.submittedAt && !isFreelancer)}
-              />
+              {isFreelancer ? (
+                <>
+                  <Input
+                    placeholder="Submission link or file URL"
+                    value={submissionLink}
+                    onChange={(e) => setSubmissionLink(e.target.value)}
+                    disabled={!canFreelancerSubmit}
+                  />
 
-              <Textarea
-                placeholder="Notes for reviewer (optional)"
-                value={submissionNotes}
-                onChange={(e) => setSubmissionNotes(e.target.value)}
-                rows={3}
-                disabled={Boolean(workspace.submission?.submittedAt && !isFreelancer)}
-              />
+                  <Textarea
+                    placeholder="Notes for reviewer (optional)"
+                    value={submissionNotes}
+                    onChange={(e) => setSubmissionNotes(e.target.value)}
+                    rows={3}
+                    disabled={!canFreelancerSubmit}
+                  />
 
-              {isFreelancer && job.status !== "completed" ? (
-                <Button className="w-full" onClick={submitWork}>
-                  <Upload className="h-4 w-4" /> Submit Work
-                </Button>
+                  {canFreelancerSubmit ? (
+                    <Button className="w-full" onClick={submitWork}>
+                      <Upload className="h-4 w-4" /> Submit Work
+                    </Button>
+                  ) : null}
+
+                  {workspace.submission?.submittedAt ? (
+                    <p className="text-xs text-muted-foreground">
+                      Submitted at {new Date(workspace.submission.submittedAt).toLocaleString()}
+                    </p>
+                  ) : null}
+
+                  <p className="text-xs text-muted-foreground">Add your final deliverables and notes for review.</p>
+                </>
               ) : null}
 
-              {isPoster && job.status === "submitted" ? (
-                <Button className="w-full" onClick={approveSubmission}>
-                  <CheckCircle2 className="h-4 w-4" /> Approve Submission
-                </Button>
-              ) : null}
+              {isPoster ? (
+                <>
+                  {hasSubmission ? (
+                    <div className="space-y-2 rounded-xl border border-border bg-background/60 p-3">
+                      <p className="text-xs font-semibold uppercase tracking-[0.03em] text-muted-foreground">Submitted Link</p>
+                      <a
+                        href={workspace.submission.link}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block truncate text-sm font-medium text-accent hover:text-accent/80"
+                      >
+                        {workspace.submission.link}
+                      </a>
+                      <p className="text-xs font-semibold uppercase tracking-[0.03em] text-muted-foreground">Notes</p>
+                      <p className="text-sm text-muted-foreground">{workspace.submission.notes || "No notes added."}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Submitted at {new Date(workspace.submission.submittedAt || "").toLocaleString()}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Freelancer has not submitted work yet.</p>
+                  )}
 
-              {workspace.submission?.submittedAt ? (
-                <p className="text-xs text-muted-foreground">
-                  Submitted at {new Date(workspace.submission.submittedAt).toLocaleString()}
-                </p>
+                  {job.status === "submitted" ? (
+                    <Button className="w-full" onClick={approveSubmission}>
+                      <CheckCircle2 className="h-4 w-4" /> Approve Submission
+                    </Button>
+                  ) : null}
+                </>
               ) : null}
-
-              <p className="text-xs text-muted-foreground">Add your final deliverables and notes for review.</p>
             </div>
           </div>
         </section>

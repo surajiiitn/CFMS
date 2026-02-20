@@ -318,7 +318,7 @@ export const api = {
         body: input,
       }),
     approve: (workspaceId: string) =>
-      request<{ approvedAt: string; jobStatus: string }>(`/workspaces/${workspaceId}/approve`, {
+      request<{ approvedAt: string; jobStatus: string; workspaceRemoved?: boolean }>(`/workspaces/${workspaceId}/approve`, {
         method: "POST",
         body: {},
       }),
