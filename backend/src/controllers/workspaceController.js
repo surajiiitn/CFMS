@@ -86,7 +86,6 @@ export const getWorkspaceById = asyncHandler(async (req, res) => {
 
   const workspace = await loadWorkspace(workspaceId);
   ensureParticipant(workspace, req.user._id);
-  ensureWorkspaceActive(workspace);
 
   const applicantsCount = await Proposal.countDocuments({ job: workspace.job._id });
   const serializedJob = serializeJob(workspace.job, { applicants: [], applicantsCount });

@@ -2,16 +2,33 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ChatMessage } from "@/components/ChatMessage";
+import { RatingStars } from "@/components/RatingStars";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/AuthContext";
-import { api } from "@/lib/api";
+import { api, HttpError } from "@/lib/api";
 import { connectSocket, getSocket, joinWorkspaceRoom, leaveWorkspaceRoom, sendWorkspaceSocketMessage } from "@/lib/socket";
 import type { ChatMsg, Workspace as WorkspaceType } from "@/types/cfms";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Link2, Upload, Plus, Calendar, IndianRupee, CheckCircle2, FolderOpen, RotateCcw, Loader2 } from "lucide-react";
+import { Send, Link2, Upload, Plus, Calendar, IndianRupee, CheckCircle2, FolderOpen, RotateCcw, Loader2, Clock3 } from "lucide-react";
+
+const formatDuration = (milliseconds: number) => {
+  const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0 || days > 0) parts.push(`${hours}h`);
+  parts.push(`${minutes}m`);
+  parts.push(`${seconds}s`);
+
+  return parts.slice(0, 3).join(" ");
+};
 
 const Workspace = () => {
   const { id } = useParams();
@@ -30,6 +47,11 @@ const Workspace = () => {
   const [sending, setSending] = useState(false);
   const [approving, setApproving] = useState(false);
   const [requestingChanges, setRequestingChanges] = useState(false);
+  const [submittingRating, setSubmittingRating] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [ratingComment, setRatingComment] = useState("");
+  const [ratedWorkspaceIds, setRatedWorkspaceIds] = useState<string[]>([]);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const [error, setError] = useState("");
 
   const refreshWorkspace = useCallback(async (workspaceId: string) => {
@@ -41,37 +63,39 @@ const Workspace = () => {
   }, []);
 
   useEffect(() => {
+    const timer = globalThis.setInterval(() => {
+      setNowMs(Date.now());
+    }, 1000);
+
+    return () => globalThis.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
     const initialize = async () => {
       setLoading(true);
       setError("");
 
       try {
+        if (id) {
+          await refreshWorkspace(id);
+          try {
+            await api.workspaces.start(id);
+          } catch {
+            // ignore if already started/completed
+          }
+          return;
+        }
+
         const list = await api.workspaces.listMine();
 
         if (list.workspaces.length === 0) {
-          if (id) {
-            navigate("/workspace", { replace: true });
-          }
           setWorkspace(null);
           setMessages([]);
           setLoading(false);
           return;
         }
 
-        const targetWorkspaceId = id || list.workspaces[0].id;
-
-        if (!id) {
-          navigate(`/workspace/${targetWorkspaceId}`, { replace: true });
-          return;
-        }
-
-        await refreshWorkspace(targetWorkspaceId);
-
-        try {
-          await api.workspaces.start(targetWorkspaceId);
-        } catch {
-          // ignore if already started/completed
-        }
+        navigate(`/workspace/${list.workspaces[0].id}`, { replace: true });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Unable to load workspace");
       } finally {
@@ -83,7 +107,10 @@ const Workspace = () => {
   }, [id, navigate, refreshWorkspace]);
 
   useEffect(() => {
-    if (!id || !token) return;
+    const isWorkspaceActive =
+      workspace?.status === "Active" && workspace?.job?.status !== "completed";
+
+    if (!id || !token || !isWorkspaceActive) return;
 
     const socket = connectSocket(token);
 
@@ -116,7 +143,11 @@ const Workspace = () => {
     };
 
     const onCompleted = () => {
-      navigate("/workspace", { replace: true });
+      refreshWorkspace(id).catch(() => null);
+      toast({
+        title: "Project completed",
+        description: "Workspace is now closed. You can submit a rating below.",
+      });
     };
 
     socket.on("connect", onSocketConnect);
@@ -134,7 +165,12 @@ const Workspace = () => {
       activeSocket?.off("workspace:completed", onCompleted);
       leaveWorkspaceRoom(id);
     };
-  }, [id, token, refreshWorkspace, navigate]);
+  }, [id, token, workspace?.status, workspace?.job?.status, refreshWorkspace, toast]);
+
+  useEffect(() => {
+    setRating(0);
+    setRatingComment("");
+  }, [workspace?.id]);
 
   const sendMessage = async () => {
     if (!id || !message.trim()) return;
@@ -209,12 +245,8 @@ const Workspace = () => {
 
     setApproving(true);
     try {
-      const data = await api.workspaces.approve(id);
+      await api.workspaces.approve(id);
       toast({ title: "Submission approved", description: "Job marked as completed." });
-      if (data.workspaceRemoved) {
-        navigate("/workspace", { replace: true });
-        return;
-      }
       await refreshWorkspace(id);
     } catch (err) {
       toast({
@@ -243,6 +275,45 @@ const Workspace = () => {
       });
     } finally {
       setRequestingChanges(false);
+    }
+  };
+
+  const submitRating = async () => {
+    if (!id || !workspace) return;
+
+    if (rating < 1 || rating > 5) {
+      toast({
+        title: "Rating required",
+        description: "Please select a rating from 1 to 5.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const toUserId = isPoster ? workspace.freelancer.id : workspace.poster.id;
+    setSubmittingRating(true);
+    try {
+      await api.workspaces.review(id, {
+        toUserId,
+        rating,
+        comment: ratingComment.trim(),
+      });
+      setRatedWorkspaceIds((prev) => (workspace.id && !prev.includes(workspace.id) ? [...prev, workspace.id] : prev));
+      toast({ title: "Rating submitted", description: "Thanks for sharing your feedback." });
+    } catch (err) {
+      if (err instanceof HttpError && err.status === 409) {
+        setRatedWorkspaceIds((prev) => (workspace.id && !prev.includes(workspace.id) ? [...prev, workspace.id] : prev));
+        toast({ title: "Review already submitted", description: "You already reviewed this user for this project." });
+        return;
+      }
+
+      toast({
+        title: "Unable to submit rating",
+        description: err instanceof Error ? err.message : "Please try again",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmittingRating(false);
     }
   };
 
@@ -276,8 +347,24 @@ const Workspace = () => {
   }
 
   const job = workspace.job;
+  const isWorkspaceClosed = workspace.status === "Completed" || job.status === "completed";
+  const hasRated = ratedWorkspaceIds.includes(workspace.id);
   const hasSubmission = Boolean(workspace.submission?.submittedAt && workspace.submission?.link);
   const canFreelancerSubmit = isFreelancer && (job.status === "assigned" || job.status === "in-progress");
+  const deadlineEndMs = new Date(`${job.deadline}T23:59:59`).getTime();
+  const remainingToDeadlineMs = deadlineEndMs - nowMs;
+  const completedAtMs = workspace.approvedAt ? new Date(workspace.approvedAt).getTime() : null;
+  const startedAtMs = new Date(workspace.createdAt).getTime();
+  const projectTimerLabel = Number.isNaN(deadlineEndMs)
+    ? "Deadline unavailable"
+    : remainingToDeadlineMs >= 0
+      ? `${formatDuration(remainingToDeadlineMs)} left`
+      : `${formatDuration(Math.abs(remainingToDeadlineMs))} overdue`;
+  const projectElapsedLabel = Number.isNaN(startedAtMs)
+    ? ""
+    : job.status === "completed" && completedAtMs
+      ? `Completed in ${formatDuration(Math.max(completedAtMs - startedAtMs, 0))}`
+      : `Live for ${formatDuration(Math.max(nowMs - startedAtMs, 0))}`;
 
   return (
     <DashboardLayout title="Workspace">
@@ -301,6 +388,14 @@ const Workspace = () => {
               <span className="inline-flex items-center gap-1.5">
                 <IndianRupee className="h-3.5 w-3.5" /> ₹{job.budget}
               </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Clock3 className="h-3.5 w-3.5" /> {projectTimerLabel}
+              </span>
+              {projectElapsedLabel ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <Clock3 className="h-3.5 w-3.5" /> {projectElapsedLabel}
+                </span>
+              ) : null}
             </div>
           </div>
         </div>
@@ -319,7 +414,6 @@ const Workspace = () => {
                   <ChatMessage
                     key={msg.id}
                     message={msg}
-                    isOwn={msg.senderId === user?.id}
                     isPosterMessage={msg.senderId === workspace.poster.id}
                   />
                 ))
@@ -331,9 +425,10 @@ const Workspace = () => {
             <div className="border-t border-border/70 p-3 sm:p-4">
               <div className="flex gap-2">
                 <Input
-                  placeholder="Type a message"
+                  placeholder={isWorkspaceClosed ? "Workspace closed. Chat disabled." : "Type a message"}
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
+                  disabled={sending || isWorkspaceClosed}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
@@ -341,7 +436,7 @@ const Workspace = () => {
                     }
                   }}
                 />
-                <Button size="icon" onClick={sendMessage} disabled={sending}>
+                <Button size="icon" onClick={sendMessage} disabled={sending || isWorkspaceClosed}>
                   {sending ? <Upload className="h-4 w-4 animate-pulse" /> : <Send className="h-4 w-4" />}
                 </Button>
               </div>
@@ -353,12 +448,14 @@ const Workspace = () => {
           <div className="rounded-3xl border border-border/70 bg-card/95 p-5 shadow-sm">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-sm font-semibold text-card-foreground">Shared resources</h3>
-              <button
-                onClick={() => setShowAddLink((prev) => !prev)}
-                className="inline-flex items-center gap-1 text-xs font-semibold text-accent hover:text-accent/80"
-              >
-                <Plus className="h-3.5 w-3.5" /> Add
-              </button>
+              {!isWorkspaceClosed ? (
+                <button
+                  onClick={() => setShowAddLink((prev) => !prev)}
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-accent hover:text-accent/80"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add
+                </button>
+              ) : null}
             </div>
 
             {showAddLink ? (
@@ -468,6 +565,33 @@ const Workspace = () => {
               ) : null}
             </div>
           </div>
+
+          {job.status === "completed" ? (
+            <div className="rounded-3xl border border-border/70 bg-card/95 p-5 shadow-sm">
+              <h3 className="mb-3 text-sm font-semibold text-card-foreground">Project Rating</h3>
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Rate {isPoster ? workspace.freelancer.name : workspace.poster.name} for this completed project.
+                </p>
+                <RatingStars rating={rating} interactive={!hasRated} onChange={setRating} size={20} />
+                <Textarea
+                  value={ratingComment}
+                  onChange={(e) => setRatingComment(e.target.value)}
+                  placeholder="Optional feedback"
+                  rows={3}
+                  disabled={hasRated || submittingRating}
+                />
+                {hasRated ? (
+                  <p className="text-xs font-semibold text-success">You already submitted your rating for this project.</p>
+                ) : (
+                  <Button className="w-full" onClick={submitRating} disabled={submittingRating || rating < 1}>
+                    {submittingRating ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                    Submit Rating
+                  </Button>
+                )}
+              </div>
+            </div>
+          ) : null}
         </section>
       </div>
     </DashboardLayout>
