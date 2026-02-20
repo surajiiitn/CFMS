@@ -50,7 +50,6 @@ const Workspace = () => {
   const [submittingRating, setSubmittingRating] = useState(false);
   const [rating, setRating] = useState(0);
   const [ratingComment, setRatingComment] = useState("");
-  const [ratedWorkspaceIds, setRatedWorkspaceIds] = useState<string[]>([]);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [error, setError] = useState("");
 
@@ -298,12 +297,12 @@ const Workspace = () => {
         rating,
         comment: ratingComment.trim(),
       });
-      setRatedWorkspaceIds((prev) => (workspace.id && !prev.includes(workspace.id) ? [...prev, workspace.id] : prev));
       toast({ title: "Rating submitted", description: "Thanks for sharing your feedback." });
+      navigate("/workspace", { replace: true });
     } catch (err) {
       if (err instanceof HttpError && err.status === 409) {
-        setRatedWorkspaceIds((prev) => (workspace.id && !prev.includes(workspace.id) ? [...prev, workspace.id] : prev));
-        toast({ title: "Review already submitted", description: "You already reviewed this user for this project." });
+        toast({ title: "Rating already submitted", description: "This workspace has already been rated and closed." });
+        navigate("/workspace", { replace: true });
         return;
       }
 
@@ -348,7 +347,6 @@ const Workspace = () => {
 
   const job = workspace.job;
   const isWorkspaceClosed = workspace.status === "Completed" || job.status === "completed";
-  const hasRated = ratedWorkspaceIds.includes(workspace.id);
   const hasSubmission = Boolean(workspace.submission?.submittedAt && workspace.submission?.link);
   const canFreelancerSubmit = isFreelancer && (job.status === "assigned" || job.status === "in-progress");
   const deadlineEndMs = new Date(`${job.deadline}T23:59:59`).getTime();
@@ -573,22 +571,18 @@ const Workspace = () => {
                 <p className="text-sm text-muted-foreground">
                   Rate {isPoster ? workspace.freelancer.name : workspace.poster.name} for this completed project.
                 </p>
-                <RatingStars rating={rating} interactive={!hasRated} onChange={setRating} size={20} />
+                <RatingStars rating={rating} interactive={!submittingRating} onChange={setRating} size={20} />
                 <Textarea
                   value={ratingComment}
                   onChange={(e) => setRatingComment(e.target.value)}
                   placeholder="Optional feedback"
                   rows={3}
-                  disabled={hasRated || submittingRating}
+                  disabled={submittingRating}
                 />
-                {hasRated ? (
-                  <p className="text-xs font-semibold text-success">You already submitted your rating for this project.</p>
-                ) : (
-                  <Button className="w-full" onClick={submitRating} disabled={submittingRating || rating < 1}>
-                    {submittingRating ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                    Submit Rating
-                  </Button>
-                )}
+                <Button className="w-full" onClick={submitRating} disabled={submittingRating || rating < 1}>
+                  {submittingRating ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  Submit Rating
+                </Button>
               </div>
             </div>
           ) : null}

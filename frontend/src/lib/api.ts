@@ -380,7 +380,10 @@ export const api = {
         body: {},
       }),
     review: (workspaceId: string, input: { toUserId?: string; rating: number; comment?: string }) =>
-      request<{ review: Review }>(`/workspaces/${workspaceId}/reviews`, { method: "POST", body: input }),
+      request<{ review: Review; workspaceRemoved?: boolean }>(`/workspaces/${workspaceId}/reviews`, {
+        method: "POST",
+        body: input,
+      }),
   },
 
   notifications: {
